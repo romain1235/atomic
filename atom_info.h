@@ -15,6 +15,7 @@ public:
   void layoutSubviews(bool force = false) override;
   KDSize minimalSizeForOptimalDisplay() const override;
   void setAtom(AtomDef atom);
+  AtomDef atom() const { return m_atom; }
 private:
   AtomDef m_atom;
   MessageTextView m_atomName;

@@ -8,6 +8,7 @@
 #include "table_lines_view.h"
 #include "atoms.h"
 #include "list_controller.h"
+#include "type_footer_view.h"
 
 namespace Atomic {
 
@@ -37,7 +38,7 @@ private:
     ContentView(TableController * controller, SelectableTableViewDataSource * selectionDataSource);
     SelectableTableView * selectableTableView();
     void drawRect(KDContext * ctx, KDRect rect) const override;
-    void setAtom(AtomDef atom) { m_info.setAtom(atom); }
+    void setAtom(AtomDef atom);
   private:
     int numberOfSubviews() const override;
     View * subviewAtIndex(int index) override;
@@ -46,18 +47,22 @@ private:
     Shared::OkView m_ok;
     atomInfo m_info;
     tableLinesView m_lines;
+    TypeFooterView m_typeFooter;
   };
   static constexpr KDCoordinate k_sideMargin = 6;
   static constexpr KDCoordinate k_indicatorMargin = 61;
   static constexpr int k_numberOfColumns = 18;
   static constexpr int k_maxNumberOfCells = 180;
+  static constexpr int k_numberOfRows = ((k_maxNumberOfCells - 1) / k_numberOfColumns) + 1;
   static constexpr int k_cellHeight = 17;
   static constexpr int k_cellWidth = 17;
   int m_position;
   ContentView m_view;
   AtomicCell m_cells[k_maxNumberOfCells];
+  int m_atomIndex[k_numberOfColumns][k_numberOfRows];
   int m_cursor = 0;
   ListController m_list;
+  bool m_menuIsOpen = false;
 };
 
 }

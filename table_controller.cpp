@@ -12,7 +12,8 @@ namespace Atomic {
 TableController::ContentView::ContentView(TableController * controller, SelectableTableViewDataSource * selectionDataSource) :
   m_selectableTableView(controller, controller, selectionDataSource, controller)
 {
-  m_selectableTableView.setVerticalCellOverlap(0);
+  m_selectableTableView.setVerticalCellOverlap(-1);
+  m_selectableTableView.setHorizontalCellOverlap(-1);
   m_selectableTableView.setMargins(k_sideMargin, k_sideMargin, k_sideMargin, k_sideMargin);
   m_selectableTableView.setBackgroundColor(Palette::BackgroundApps);
 }
@@ -21,12 +22,22 @@ SelectableTableView * TableController::ContentView::selectableTableView() {
   return &m_selectableTableView;
 }
 
+
 void TableController::ContentView::drawRect(KDContext * ctx, KDRect rect) const {
+  // Dessiner uniquement le fond de la vue
   ctx->fillRect(bounds(), Palette::BackgroundApps);
+
+  // Afficher le type de l'élément sélectionné en bas à gauche
+  AtomDef atom = m_info.atom();
+  I18n::Message typeMsg = AtomicI18nForType[atom.type];
+  KDSize typeSize = KDFont::SmallFont->stringSize(I18n::translate(typeMsg));
+  int x = 8;
+  int y = 200;
+  ctx->drawString(I18n::translate(typeMsg), KDPoint(x, y), KDFont::SmallFont, Palette::PrimaryText, Palette::BackgroundApps);
 }
 
 int TableController::ContentView::numberOfSubviews() const {
-  return 4;
+  return 5;
 }
 
 View * TableController::ContentView::subviewAtIndex(int index) {
@@ -39,6 +50,8 @@ View * TableController::ContentView::subviewAtIndex(int index) {
       return &m_info;
     case 3:
       return &m_lines;
+    case 4:
+      return &m_typeFooter;
     default:
       assert(false);
       return nullptr;
@@ -50,6 +63,13 @@ void TableController::ContentView::layoutSubviews(bool force) {
   m_ok.setFrame(KDRect(295, 200, m_ok.minimalSizeForOptimalDisplay()), force);
   m_info.setFrame(KDRect(KDPoint(48, 15),m_info.minimalSizeForOptimalDisplay()), force);
   m_lines.setFrame(KDRect(KDPoint(40, 99 + 20), m_lines.minimalSizeForOptimalDisplay()), force);
+  m_typeFooter.setFrame(KDRect(0, bounds().height() - m_typeFooter.minimalSizeForOptimalDisplay().height(),
+    m_typeFooter.minimalSizeForOptimalDisplay().width(), m_typeFooter.minimalSizeForOptimalDisplay().height()), force);
+}
+
+void TableController::ContentView::setAtom(AtomDef atom) {
+  m_info.setAtom(atom);
+  m_typeFooter.setType(AtomicI18nForType[atom.type]);
 }
 
 TableController::TableController(Responder * parentResponder, SelectableTableViewDataSource * selectionDataSource) :
@@ -57,9 +77,27 @@ TableController::TableController(Responder * parentResponder, SelectableTableVie
   m_view(this, selectionDataSource),
   m_list(this)
 {
+  // Build a fast lookup table from (x,y) -> atomsdefs index to avoid O(n)
+  // scans in willDisplayCellAtLocation and during selection.
+  for (int x = 0; x < k_numberOfColumns; x++) {
+    for (int y = 0; y < k_numberOfRows; y++) {
+      m_atomIndex[x][y] = -1;
+    }
+  }
+  int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
+  for (int i = 0; i < count; i++) {
+    const AtomDef &a = atomsdefs[i];
+    if (a.x < k_numberOfColumns && a.y < k_numberOfRows) {
+      m_atomIndex[a.x][a.y] = i;
+    }
+  }
 }
 
 bool TableController::handleEvent(Ion::Events::Event event) {
+  if (m_menuIsOpen && event != Ion::Events::OK && event != Ion::Events::EXE) {
+    // Bloquer tous les événements sauf la fermeture du menu
+    return false;
+  }
   if (event == Ion::Events::Right && m_cursor < static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef) - 1)) {
     AtomDef atom = atomsdefs[++m_cursor];
     setSelection(atom);
@@ -104,6 +142,7 @@ bool TableController::handleEvent(Ion::Events::Event event) {
     }
   }
   if (event == Ion::Events::OK || event == Ion::Events::EXE) {
+    m_menuIsOpen = true;
     Container::activeApp()->displayModalViewController(&m_list, 0.f, 0.f, Metric::CommonTopMargin, Metric::PopUpLeftMargin, 0, Metric::PopUpRightMargin);
     m_list.unhighlightTopCells();
     return true;
@@ -112,6 +151,7 @@ bool TableController::handleEvent(Ion::Events::Event event) {
 }
 
 void TableController::didBecomeFirstResponder() {
+  m_menuIsOpen = false;
   if (selectionDataSource()->selectedRow() == -1) {
     setSelection(atomsdefs[0]);
   } else {
@@ -150,10 +190,11 @@ int TableController::reusableCellCount() const {
 
 void TableController::willDisplayCellAtLocation(HighlightCell * cell, int i, int j) {
   AtomicCell* c = static_cast<AtomicCell*>(cell);
-  for (AtomDef atom : atomsdefs) {
-    if (atom.x == i && atom.y == j) {
+  if (i >= 0 && i < k_numberOfColumns && j >= 0 && j < k_numberOfRows) {
+    int index = m_atomIndex[i][j];
+    if (index >= 0) {
       c->setVisible(true);
-      c->setAtom(atom);
+      c->setAtom(atomsdefs[index]);
       return;
     }
   }

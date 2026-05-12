@@ -22,13 +22,13 @@ void atomInfo::drawRect(KDContext * ctx, KDRect rect) const {
   KDColor color = Palette::AtomColor[m_atom.type];
 
   // Get the border color
-  KDColor border = KDColor::blend(color, Palette::AtomHighlight, 0x7F);
+  KDColor highlighted = Palette::AtomColorHighlighted[m_atom.type];
 
   // Draw the background
   ctx->fillRect(KDRect(rect.left() + 1, rect.top() + 1, 48, 48), color);
 
   // Draw the border
-  ctx->strokeRect(KDRect(rect.left(), rect.top(), 50, 50), border);
+  ctx->strokeRect(KDRect(rect.left(), rect.top(), 50, 50), highlighted);
 
 
   // Get the number of nucleons and protons
@@ -58,18 +58,16 @@ void atomInfo::drawRect(KDContext * ctx, KDRect rect) const {
   int protonsY = nucleonsY + nucleonsSize.height();
   int symbolY = (50 - symbolSize.height()) / 2;
 
-
   // Draw the number of nucleons
   KDPoint coordonates(nucleonsPosition, nucleonsY);
-  ctx->drawString(nucleons, coordonates, KDFont::SmallFont, Palette::AtomText, color);
+  ctx->drawString(nucleons, coordonates, KDFont::SmallFont, highlighted, color);
 
   // Draw the number of protons
   coordonates = KDPoint(protonsPosition, protonsY);
-  ctx->drawString(protons, coordonates, KDFont::SmallFont, Palette::AtomText, color);
-
+  ctx->drawString(protons, coordonates, KDFont::SmallFont, highlighted, color);
   // Draw the symbol of the atom
   coordonates = KDPoint(symbolPosition, symbolY);
-  ctx->drawString(m_atom.symbol, coordonates, KDFont::LargeFont, Palette::AtomText, color);
+  ctx->drawString(m_atom.symbol, coordonates, KDFont::LargeFont, highlighted, color);
 
 
   // Get the y position of the mass

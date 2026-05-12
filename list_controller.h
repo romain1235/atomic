@@ -38,6 +38,7 @@ private:
   private:
     SelectableTableView m_selectableTableView;
     AtomDef m_atom;
+    bool m_hasAtom = false;
   };
 
   class Electronical {

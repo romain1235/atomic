@@ -15,8 +15,12 @@ ListController::InnerView::InnerView(ListController * dataSource) :
 }
 
 void ListController::InnerView::setAtom(AtomDef atom) {
- m_atom = atom;
- m_selectableTableView.reloadData(false);
+  if (m_hasAtom && m_atom.num == atom.num) {
+    return;
+  }
+  m_atom = atom;
+  // Reload the selectable view to reflect the new atom
+  m_selectableTableView.reloadData(false);
 }
 
 void ListController::InnerView::didBecomeFirstResponder() {
