@@ -1,3 +1,5 @@
+AtomicApp = "Éléments"
+AtomicAppCapital = "ÉLÉMENTS"
 AtomSymbol = "Symbole"
 AtomNum = "Protons"
 AtomNeutrons = "Neutrons"

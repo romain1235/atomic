@@ -1,3 +1,5 @@
+AtomicApp = "Elemek"
+AtomicAppCapital = "ELEMEK"
 AtomSymbol = "Szimbólum"
 AtomNum = "Protonok"
 AtomNeutrons = "Semlegesek"
