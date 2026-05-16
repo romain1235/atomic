@@ -126,7 +126,7 @@ void TableController::ContentView::layoutSubviews(bool force) {
 
 void TableController::ContentView::setAtom(AtomDef atom) {
   m_info.setAtom(atom);
-  m_typeFooter.setType(AtomicI18nForType[atom.type]);
+  m_typeFooter.setType(atom.type);
 }
 
 void TableController::ContentView::setSearchInput(bool active, const char * text, int cursor) {

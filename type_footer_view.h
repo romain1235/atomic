@@ -8,8 +8,8 @@ namespace Atomic {
 
 class TypeFooterView : public View {
 public:
-  TypeFooterView() : m_type(I18n::Message::AtomTypeUNKNOWN) {}
-  void setType(I18n::Message type) { m_type = type; markRectAsDirty(bounds()); }
+  TypeFooterView() : m_type(UNKNOWN) {}
+  void setType(AtomType type) { m_type = type; markRectAsDirty(bounds()); }
   void setSearchInput(bool active, const char * text, int cursor) {
     m_searchActive = active;
     if (text == nullptr) {
@@ -52,18 +52,18 @@ public:
       return;
     }
 
-    const char* typeStr = I18n::translate(m_type);
+    const char* typeStr = I18n::translate(AtomicI18nForType[m_type]);
     KDSize typeSize = KDFont::SmallFont->stringSize(typeStr);
     ctx->fillRect(bounds(), Palette::BackgroundApps);
     int x = 8;
     int y = bounds().height() - typeSize.height() - 4;
-    ctx->drawString(typeStr, KDPoint(x, y), KDFont::SmallFont, Palette::PrimaryText, Palette::BackgroundApps);
+    ctx->drawString(typeStr, KDPoint(x, y), KDFont::SmallFont, Palette::AtomColorHighlighted[m_type], Palette::BackgroundApps);
   }
   KDSize minimalSizeForOptimalDisplay() const override {
     return KDSize(320, KDFont::LargeFont->glyphSize().height() + 8);
   }
 private:
-  I18n::Message m_type;
+  AtomType m_type;
   bool m_searchActive = false;
   int m_searchCursor = 0;
   char m_searchText[20] = {'\0'};
