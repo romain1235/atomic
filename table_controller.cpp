@@ -270,7 +270,10 @@ bool TableController::handleEvent(Ion::Events::Event event) {
   }
   if (event == Ion::Events::OK || event == Ion::Events::EXE) {
     if (m_searchActive) {
-      if (m_bestSearchResult >= 0) {
+      int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
+      if (m_cursor >= 0 && m_cursor < count && m_searchMatches[m_cursor]) {
+        // Keep current selection chosen with Up/Down among search results.
+      } else if (m_bestSearchResult >= 0) {
         m_cursor = m_bestSearchResult;
       } else if (m_searchStartCursor >= 0) {
         m_cursor = m_searchStartCursor;
