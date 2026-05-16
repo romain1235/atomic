@@ -221,6 +221,11 @@ bool TableController::handleEvent(Ion::Events::Event event) {
   }
   if (event == Ion::Events::Up) {
     if (m_searchActive) {
+      int nextIndex = nextSearchResultIndex(-1);
+      if (nextIndex >= 0) {
+        m_cursor = nextIndex;
+        setSelection(atomsdefs[m_cursor]);
+      }
       return true;
     }
     int row = selectionDataSource()->selectedRow();
@@ -242,6 +247,11 @@ bool TableController::handleEvent(Ion::Events::Event event) {
   }
   if (event == Ion::Events::Down) {
     if (m_searchActive) {
+      int nextIndex = nextSearchResultIndex(1);
+      if (nextIndex >= 0) {
+        m_cursor = nextIndex;
+        setSelection(atomsdefs[m_cursor]);
+      }
       return true;
     }
     int row = selectionDataSource()->selectedRow();
@@ -343,7 +353,6 @@ void TableController::setSelection(AtomDef atom) {
 void TableController::appendCharacterToSearch(char c) {
   if (m_searchLength == 0) {
     m_searchStartCursor = m_cursor;
-    m_view.selectableTableView()->deselectTable();
   }
   if (m_searchLength >= static_cast<int>(sizeof(m_searchBuffer) - 1)) {
     return;
@@ -417,16 +426,37 @@ void TableController::refreshSearchResults() {
     }
   }
   if (m_bestSearchResult >= 0) {
+    m_cursor = m_bestSearchResult;
+    setSelection(atomsdefs[m_cursor]);
     m_view.setInfoVisible(true);
-    m_view.setAtom(atomsdefs[m_bestSearchResult]);
-    m_list.setAtom(atomsdefs[m_bestSearchResult]);
   } else {
     m_view.setInfoVisible(false);
+    m_view.selectableTableView()->deselectTable();
   }
   m_view.setSearchInput(true, m_searchBuffer, m_searchCursor);
   if (!wasSearchActive) {
     m_view.selectableTableView()->reloadData(false);
   }
+}
+
+int TableController::nextSearchResultIndex(int direction) const {
+  int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
+  if (count <= 0 || m_bestSearchResult < 0) {
+    return -1;
+  }
+
+  int start = (m_cursor >= 0 && m_cursor < count) ? m_cursor : m_bestSearchResult;
+  int stepDirection = direction < 0 ? -1 : 1;
+  for (int step = 1; step <= count; step++) {
+    int index = (start + stepDirection * step) % count;
+    if (index < 0) {
+      index += count;
+    }
+    if (m_searchMatches[index]) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 int TableController::scoreForSearch(const AtomDef & atom, const char * query, int queryLength, bool isNumeric) const {

@@ -36,6 +36,7 @@ private:
   void removeCharacterFromSearch();
   void clearSearch();
   void refreshSearchResults();
+  int nextSearchResultIndex(int direction) const;
   int scoreForSearch(const AtomDef & atom, const char * query, int queryLength, bool isNumeric) const;
   static bool startsWithIgnoreCase(const char * text, const char * query);
   static bool isNumericString(const char * text);
