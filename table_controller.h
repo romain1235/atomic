@@ -32,6 +32,13 @@ public:
 private:
   SelectableTableViewDataSource * selectionDataSource() const;
   void setSelection(AtomDef atom);
+  void appendCharacterToSearch(char c);
+  void removeCharacterFromSearch();
+  void clearSearch();
+  void refreshSearchResults();
+  int scoreForSearch(const AtomDef & atom, const char * query, int queryLength, bool isNumeric) const;
+  static bool startsWithIgnoreCase(const char * text, const char * query);
+  static bool isNumericString(const char * text);
   StackViewController * stackController() const;
   class ContentView : public View {
   public:
@@ -39,6 +46,8 @@ private:
     SelectableTableView * selectableTableView();
     void drawRect(KDContext * ctx, KDRect rect) const override;
     void setAtom(AtomDef atom);
+    void setSearchInput(bool active, const char * text, int cursor);
+    void setInfoVisible(bool visible);
   private:
     int numberOfSubviews() const override;
     View * subviewAtIndex(int index) override;
@@ -59,6 +68,13 @@ private:
   int m_position;
   ContentView m_view;
   AtomicCell m_cells[k_maxNumberOfCells];
+  bool m_searchMatches[k_maxNumberOfCells];
+  char m_searchBuffer[20];
+  int m_searchLength;
+  int m_searchCursor;
+  int m_searchStartCursor;
+  int m_bestSearchResult;
+  bool m_searchActive;
   int m_atomIndex[k_numberOfColumns][k_numberOfRows];
   int m_cursor = 0;
   ListController m_list;

@@ -17,6 +17,7 @@ public:
 
   void setVisible(bool visible);
   void setAtom(AtomDef atom);
+  void setSearchState(bool searchActive, bool isMatch);
   void reloadCell() override;
 private:
   static constexpr KDCoordinate k_iconMargin = 22;
@@ -25,6 +26,8 @@ private:
   static constexpr KDCoordinate k_nameWidthMargin = 4;
   static constexpr KDCoordinate k_nameHeightMargin = 1;
   bool m_visible;
+  bool m_searchActive;
+  bool m_searchMatch;
   AtomDef m_atom;
   KDColor colorForType(AtomType type) const;
 };
