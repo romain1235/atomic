@@ -36,10 +36,10 @@ public:
       KDSize textSize = KDFont::LargeFont->stringSize(m_searchText);
       ctx->fillRect(bounds(), Palette::BackgroundApps);
       KDRect inputRect(6, 2, bounds().width() - 12, bounds().height() - 4);
-      ctx->fillRect(inputRect, Palette::ExpressionInputBackground);
+      ctx->fillRect(inputRect, Palette::BackgroundApps);
       int x = inputRect.x() + 4;
       int y = bounds().height() - textSize.height() - 5;
-      ctx->drawString(m_searchText, KDPoint(x, y), KDFont::LargeFont, Palette::PrimaryText, Palette::ExpressionInputBackground);
+      ctx->drawString(m_searchText, KDPoint(x, y), KDFont::LargeFont, Palette::PrimaryText, Palette::BackgroundApps);
       char beforeCursor[20];
       int i = 0;
       for (; i < m_searchCursor && i < static_cast<int>(sizeof(beforeCursor) - 1) && m_searchText[i] != '\0'; i++) {
