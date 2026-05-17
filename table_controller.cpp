@@ -3,7 +3,11 @@
 #include "../apps_container.h"
 #include <ion/unicode/utf8_decoder.h>
 #include <string.h>
+#include <poincare/integer.h>
+#include <poincare/number.h>
 #include <escher/palette.h>
+#include <float.h>
+#include <stdio.h>
 
 extern "C" {
 #include <assert.h>
@@ -94,7 +98,7 @@ void TableController::ContentView::drawRect(KDContext * ctx, KDRect rect) const 
 }
 
 int TableController::ContentView::numberOfSubviews() const {
-  return 5;
+  return 4;
 }
 
 View * TableController::ContentView::subviewAtIndex(int index) {
@@ -102,12 +106,10 @@ View * TableController::ContentView::subviewAtIndex(int index) {
     case 0:
       return &m_selectableTableView;
     case 1:
-      return &m_ok;
-    case 2:
       return &m_info;
-    case 3:
+    case 2:
       return &m_lines;
-    case 4:
+    case 3:
       return &m_typeFooter;
     default:
       assert(false);
@@ -117,7 +119,6 @@ View * TableController::ContentView::subviewAtIndex(int index) {
 
 void TableController::ContentView::layoutSubviews(bool force) {
   m_selectableTableView.setFrame(KDRect(bounds().top(), bounds().left() + 20 , bounds().width(), bounds().height() - 20), force);
-  m_ok.setFrame(KDRect(295, 200, m_ok.minimalSizeForOptimalDisplay()), force);
   m_info.setFrame(KDRect(KDPoint(48, 15),m_info.minimalSizeForOptimalDisplay()), force);
   m_lines.setFrame(KDRect(KDPoint(40, 99 + 20), m_lines.minimalSizeForOptimalDisplay()), force);
   m_typeFooter.setFrame(KDRect(0, bounds().height() - m_typeFooter.minimalSizeForOptimalDisplay().height(),
@@ -139,6 +140,16 @@ void TableController::ContentView::setInfoVisible(bool visible) {
   } else {
     m_info.setFrame(KDRect(0, 0, 0, 0), true);
   }
+}
+
+void TableController::ContentView::setPropertyDisplay(const char * label, const char * value, KDColor bgColor, KDColor textColor) {
+  m_typeFooter.setPropertyDisplay(label, value, bgColor, textColor);
+  m_info.setCustomColors(bgColor, textColor);
+}
+
+void TableController::ContentView::clearPropertyDisplay() {
+  m_typeFooter.clearPropertyDisplay();
+  m_info.clearCustomColors();
 }
 
 TableController::TableController(Responder * parentResponder, SelectableTableViewDataSource * selectionDataSource) :
@@ -337,10 +348,193 @@ void TableController::willDisplayCellAtLocation(HighlightCell * cell, int i, int
       c->setVisible(true);
       c->setAtom(atomsdefs[index]);
       c->setSearchState(m_searchActive, m_searchMatches[index]);
+      // Apply custom coloring if requested
+      if (m_coloringActive) {
+        KDColor color = Palette::BackgroundApps;
+        const AtomDef & a = atomsdefs[index];
+        // Compute blended background and text colors based on selected property
+        KDColor propertyColor = Palette::AtomColor[a.type];
+        KDColor propertyColorHighlighted = Palette::AtomColorHighlighted[a.type];
+        switch (m_colorProperty) {
+          case ColorByAtomicNumber:
+            propertyColor = Palette::AtomPropertyNum;
+            propertyColorHighlighted = Palette::AtomPropertyNumHighlighted;
+            break;
+          case ColorByNeutrons:
+            propertyColor = Palette::AtomPropertyNeutrons;
+            propertyColorHighlighted = Palette::AtomPropertyNeutronsHighlighted;
+            break;
+          case ColorByMass:
+            propertyColor = Palette::AtomPropertyMass;
+            propertyColorHighlighted = Palette::AtomPropertyMassHighlighted;
+            break;
+          case ColorByElectronegativity:
+            propertyColor = Palette::AtomPropertyElectroneg;
+            propertyColorHighlighted = Palette::AtomPropertyElectronegHighlighted;
+            break;
+          default:
+            propertyColor = Palette::AtomColor[a.type];
+            propertyColorHighlighted = Palette::AtomColorHighlighted[a.type];
+            break;
+        }
+        if (m_coloringActive && m_propertyMax > m_propertyMin) {
+          double v = 0.0;
+          switch (m_colorProperty) {
+            case ColorByAtomicNumber: v = a.num; break;
+            case ColorByNeutrons: v = a.neutrons; break;
+            case ColorByMass: v = a.mass; break;
+            case ColorByElectronegativity: v = a.electroneg; break;
+            default: v = -1; break;
+          }
+          if (v < 0) {
+            c->setCustomColor(Palette::BackgroundAppsSecondary);
+            c->setCustomTextColor(Palette::SecondaryText);
+          } else {
+            double ratio = (v - m_propertyMin) / (m_propertyMax - m_propertyMin);
+            if (ratio < 0.0) { ratio = 0.0; }
+            if (ratio > 1.0) { ratio = 1.0; }
+            uint8_t alpha = static_cast<uint8_t>(ratio * 255);
+            KDColor bg = KDColor::blend(propertyColor, Palette::BackgroundAppsSecondary, alpha);
+            KDColor fg = KDColor::blend(propertyColorHighlighted, Palette::SecondaryText, alpha);
+            c->setCustomColor(bg);
+            c->setCustomTextColor(fg);
+          }
+        } else {
+          c->setCustomColor(Palette::AtomColor[a.type]);
+          c->setCustomTextColor(Palette::AtomColorHighlighted[a.type]);
+        }
+      } else {
+          c->clearCustomColor();
+          c->clearCustomTextColor();
+      }
       return;
     }
   }
   c->setVisible(false);
+}
+
+void TableController::setColorProperty(ColorProperty p) {
+  m_colorProperty = p;
+  if (p == ColorByType) {
+    m_coloringActive = false;
+    m_view.clearPropertyDisplay();
+    reloadTableData();
+    return;
+  }
+  // Compute min and max for the selected property
+  double minv = DBL_MAX;
+  double maxv = -DBL_MAX;
+  int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
+  for (int i = 0; i < count; i++) {
+    const AtomDef & a = atomsdefs[i];
+    double v = 0.0;
+    switch (p) {
+      case ColorByAtomicNumber: v = a.num; break;
+      case ColorByNeutrons: v = a.neutrons; break;
+      case ColorByMass: v = a.mass; break;
+      case ColorByElectronegativity: v = a.electroneg; break;
+      default: v = -1; break;
+    }
+    if (v < 0) { continue; }
+    if (v < minv) { minv = v; }
+    if (v > maxv) { maxv = v; }
+  }
+  if (minv == DBL_MAX || maxv == -DBL_MAX) {
+    m_coloringActive = false;
+  } else {
+    m_propertyMin = minv;
+    m_propertyMax = maxv;
+    m_coloringActive = true;
+  }
+  // Update footer display for current selection
+  if (m_coloringActive) {
+    int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
+    if (m_cursor >= 0 && m_cursor < count) {
+      const AtomDef & a = atomsdefs[m_cursor];
+      const char * label = "";
+      char value[32] = "";
+      KDColor propColor = Palette::AtomColor[a.type];
+      KDColor propColorH = Palette::AtomColorHighlighted[a.type];
+      double v = -1;
+      switch (p) {
+        case ColorByAtomicNumber:
+          label = I18n::translate(I18n::Message::AtomNum);
+          Poincare::Integer(a.num).serialize(value, sizeof(value));
+          propColor = Palette::AtomPropertyNum;
+          propColorH = Palette::AtomPropertyNumHighlighted;
+          v = a.num;
+          break;
+        case ColorByNeutrons:
+          label = I18n::translate(I18n::Message::AtomNeutrons);
+          Poincare::Integer(a.neutrons).serialize(value, sizeof(value));
+          propColor = Palette::AtomPropertyNeutrons;
+          propColorH = Palette::AtomPropertyNeutronsHighlighted;
+          v = a.neutrons;
+          break;
+        case ColorByMass:
+          label = I18n::translate(I18n::Message::AtomMass);
+          if (a.mass < 0) {
+            value[0] = '-'; value[1] = '\0';
+          } else {
+            char tmp[32];
+            Poincare::Number::FloatNumber(a.mass).serialize(tmp, sizeof(tmp), Poincare::Preferences::PrintFloatMode::Decimal, 3);
+            int len = 0;
+            while (len < static_cast<int>(sizeof(value) - 3) && tmp[len] != '\0') { value[len] = tmp[len]; len++; }
+            if (len < static_cast<int>(sizeof(value) - 2)) { value[len++] = ' '; value[len++] = 'u'; }
+            value[len] = '\0';
+          }
+          propColor = Palette::AtomPropertyMass;
+          propColorH = Palette::AtomPropertyMassHighlighted;
+          v = a.mass;
+          break;
+        case ColorByElectronegativity:
+          label = I18n::translate(I18n::Message::AtomElectroneg);
+          if (a.electroneg < 0) {
+            value[0] = '-'; value[1] = '\0';
+          } else {
+            char tmp[32];
+            Poincare::Number::FloatNumber(a.electroneg).serialize(tmp, sizeof(tmp), Poincare::Preferences::PrintFloatMode::Decimal, 2);
+            int len = 0;
+            while (len < static_cast<int>(sizeof(value) - 1) && tmp[len] != '\0') { value[len] = tmp[len]; len++; }
+            value[len] = '\0';
+          }
+          propColor = Palette::AtomPropertyElectroneg;
+          propColorH = Palette::AtomPropertyElectronegHighlighted;
+          v = a.electroneg;
+          break;
+        default:
+          break;
+      }
+      KDColor bg = Palette::BackgroundApps;
+      KDColor fg = Palette::PrimaryText;
+      if (v < 0) {
+        bg = Palette::BackgroundAppsSecondary;
+        fg = Palette::SecondaryText;
+      } else if (m_propertyMax > m_propertyMin) {
+        double ratio = (v - m_propertyMin) / (m_propertyMax - m_propertyMin);
+        if (ratio < 0.0) { ratio = 0.0; }
+        if (ratio > 1.0) { ratio = 1.0; }
+        uint8_t alpha = static_cast<uint8_t>(ratio * 255);
+        bg = KDColor::blend(propColor, Palette::BackgroundAppsSecondary, alpha);
+        fg = KDColor::blend(propColorH, Palette::SecondaryText, alpha);
+      }
+      m_view.setPropertyDisplay(label, value, bg, fg);
+    }
+  } else {
+    m_view.clearPropertyDisplay();
+  }
+  reloadTableData();
+}
+
+void TableController::clearColorProperty() {
+  m_coloringActive = false;
+  m_colorProperty = ColorByType;
+  m_view.clearPropertyDisplay();
+  reloadTableData();
+}
+
+void TableController::reloadTableData() {
+  m_view.selectableTableView()->reloadData(false);
 }
 
 SelectableTableViewDataSource * TableController::selectionDataSource() const {
@@ -351,6 +545,80 @@ void TableController::setSelection(AtomDef atom) {
   m_view.selectableTableView()->selectCellAtLocation(atom.x,atom.y,false);
   m_view.setAtom(atom);
   m_list.setAtom(atomsdefs[m_cursor]);
+  // Update footer property display for newly selected atom
+  if (m_coloringActive) {
+    const AtomDef & a = atom;
+    const char * label = "";
+    char value[32] = "";
+    KDColor propColor = Palette::AtomColor[a.type];
+    KDColor propColorH = Palette::AtomColorHighlighted[a.type];
+    double v = -1;
+    switch (m_colorProperty) {
+      case ColorByAtomicNumber:
+        label = I18n::translate(I18n::Message::AtomNum);
+        Poincare::Integer(a.num).serialize(value, sizeof(value));
+        propColor = Palette::AtomPropertyNum;
+        propColorH = Palette::AtomPropertyNumHighlighted;
+        v = a.num;
+        break;
+      case ColorByNeutrons:
+        label = I18n::translate(I18n::Message::AtomNeutrons);
+        Poincare::Integer(a.neutrons).serialize(value, sizeof(value));
+        propColor = Palette::AtomPropertyNeutrons;
+        propColorH = Palette::AtomPropertyNeutronsHighlighted;
+        v = a.neutrons;
+        break;
+      case ColorByMass:
+        label = I18n::translate(I18n::Message::AtomMass);
+        if (a.mass < 0) {
+          value[0] = '-'; value[1] = '\0';
+        } else {
+          char tmp[32];
+          Poincare::Number::FloatNumber(a.mass).serialize(tmp, sizeof(tmp), Poincare::Preferences::PrintFloatMode::Decimal, 3);
+          int len = 0;
+          while (len < static_cast<int>(sizeof(value) - 3) && tmp[len] != '\0') { value[len] = tmp[len]; len++; }
+          if (len < static_cast<int>(sizeof(value) - 2)) { value[len++] = ' '; value[len++] = 'u'; }
+          value[len] = '\0';
+        }
+        propColor = Palette::AtomPropertyMass;
+        propColorH = Palette::AtomPropertyMassHighlighted;
+        v = a.mass;
+        break;
+      case ColorByElectronegativity:
+        label = I18n::translate(I18n::Message::AtomElectroneg);
+        if (a.electroneg < 0) {
+          value[0] = '-'; value[1] = '\0';
+        } else {
+          char tmp[32];
+          Poincare::Number::FloatNumber(a.electroneg).serialize(tmp, sizeof(tmp), Poincare::Preferences::PrintFloatMode::Decimal, 2);
+          int len = 0;
+          while (len < static_cast<int>(sizeof(value) - 1) && tmp[len] != '\0') { value[len] = tmp[len]; len++; }
+          value[len] = '\0';
+        }
+        propColor = Palette::AtomPropertyElectroneg;
+        propColorH = Palette::AtomPropertyElectronegHighlighted;
+        v = a.electroneg;
+        break;
+      default:
+        break;
+    }
+    KDColor bg = Palette::BackgroundApps;
+    KDColor fg = Palette::PrimaryText;
+    if (v < 0) {
+      bg = Palette::BackgroundAppsSecondary;
+      fg = Palette::SecondaryText;
+    } else if (m_propertyMax > m_propertyMin) {
+      double ratio = (v - m_propertyMin) / (m_propertyMax - m_propertyMin);
+      if (ratio < 0.0) { ratio = 0.0; }
+      if (ratio > 1.0) { ratio = 1.0; }
+      uint8_t alpha = static_cast<uint8_t>(ratio * 255);
+      bg = KDColor::blend(propColor, Palette::BackgroundAppsSecondary, alpha);
+      fg = KDColor::blend(propColorH, Palette::SecondaryText, alpha);
+    }
+    m_view.setPropertyDisplay(label, value, bg, fg);
+  } else {
+    m_view.clearPropertyDisplay();
+  }
 }
 
 void TableController::appendCharacterToSearch(char c) {

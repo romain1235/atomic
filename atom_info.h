@@ -16,9 +16,14 @@ public:
   KDSize minimalSizeForOptimalDisplay() const override;
   void setAtom(AtomDef atom);
   AtomDef atom() const { return m_atom; }
+  void setCustomColors(KDColor bg, KDColor text);
+  void clearCustomColors();
 private:
   AtomDef m_atom;
   MessageTextView m_atomName;
+  bool m_hasCustomColors = false;
+  KDColor m_customBg;
+  KDColor m_customText;
 };
 
 }

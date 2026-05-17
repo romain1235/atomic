@@ -14,15 +14,29 @@ atomInfo::atomInfo() :
 {
 }
 
+void atomInfo::setCustomColors(KDColor bg, KDColor text) {
+  m_hasCustomColors = true;
+  m_customBg = bg;
+  m_customText = text;
+  markRectAsDirty(bounds());
+}
+
+void atomInfo::clearCustomColors() {
+  if (m_hasCustomColors) {
+    m_hasCustomColors = false;
+    markRectAsDirty(bounds());
+  }
+}
+
 void atomInfo::drawRect(KDContext * ctx, KDRect rect) const {
   // Clear the background
   ctx->fillRect(rect, Palette::BackgroundApps);
 
-  // Get the color of the atom
-  KDColor color = Palette::AtomColor[m_atom.type];
+  // Get the color of the atom (or custom colors if set)
+  KDColor color = m_hasCustomColors ? m_customBg : Palette::AtomColor[m_atom.type];
 
-  // Get the border color
-  KDColor highlighted = Palette::AtomColorHighlighted[m_atom.type];
+  // Get the border / highlighted color
+  KDColor highlighted = m_hasCustomColors ? m_customText : Palette::AtomColorHighlighted[m_atom.type];
 
   // Draw the background
   ctx->fillRect(KDRect(rect.left() + 1, rect.top() + 1, 48, 48), color);
@@ -78,7 +92,7 @@ void atomInfo::drawRect(KDContext * ctx, KDRect rect) const {
   char mass[12];
   Poincare::Number::FloatNumber(m_atom.mass).serialize(mass, 12, Poincare::Preferences::PrintFloatMode::Decimal, 12);
   coordonates = KDPoint(bounds().left() + 60, massY);
-  ctx->drawString(mass, coordonates, KDFont::SmallFont, Palette::AtomText, Palette::BackgroundApps);
+  ctx->drawString(mass, coordonates, KDFont::SmallFont, m_hasCustomColors ? m_customText : Palette::AtomText, Palette::BackgroundApps);
 }
 
 int atomInfo::numberOfSubviews() const {

@@ -19,6 +19,10 @@ public:
   void setAtom(AtomDef atom);
   void setSearchState(bool searchActive, bool isMatch);
   void reloadCell() override;
+  void setCustomColor(KDColor color);
+  void clearCustomColor();
+  void setCustomTextColor(KDColor color);
+  void clearCustomTextColor();
 private:
   static constexpr KDCoordinate k_iconMargin = 22;
   static constexpr KDCoordinate k_iconWidth = 55;
@@ -29,6 +33,10 @@ private:
   bool m_searchActive;
   bool m_searchMatch;
   AtomDef m_atom;
+  bool m_hasCustomColor = false;
+  KDColor m_customColor;
+  bool m_hasCustomTextColor = false;
+  KDColor m_customTextColor;
   KDColor colorForType(AtomType type) const;
 };
 

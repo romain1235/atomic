@@ -31,6 +31,28 @@ public:
     }
     markRectAsDirty(bounds());
   }
+  void setPropertyDisplay(const char * label, const char * value, KDColor bgColor, KDColor textColor) {
+    m_showProperty = true;
+    int i = 0;
+    for (; label[i] != '\0' && i < static_cast<int>(sizeof(m_propertyLabel) - 1); i++) {
+      m_propertyLabel[i] = label[i];
+    }
+    m_propertyLabel[i] = '\0';
+    int j = 0;
+    for (; value[j] != '\0' && j < static_cast<int>(sizeof(m_propertyValue) - 1); j++) {
+      m_propertyValue[j] = value[j];
+    }
+    m_propertyValue[j] = '\0';
+    m_propertyBgColor = Palette::BackgroundApps;
+    m_propertyTextColor = textColor;
+    markRectAsDirty(bounds());
+  }
+  void clearPropertyDisplay() {
+    if (m_showProperty) {
+      m_showProperty = false;
+      markRectAsDirty(bounds());
+    }
+  }
   void drawRect(KDContext * ctx, KDRect rect) const override {
     if (m_searchActive) {
       KDSize textSize = KDFont::LargeFont->stringSize(m_searchText);
@@ -57,6 +79,24 @@ public:
     ctx->fillRect(bounds(), Palette::BackgroundApps);
     int x = 8;
     int y = bounds().height() - typeSize.height() - 4;
+    // If a property is shown, display it instead of the type
+    if (m_showProperty) {
+      ctx->fillRect(bounds(), m_propertyBgColor);
+      char full[64];
+      int i = 0;
+      for (; m_propertyLabel[i] != '\0' && i < static_cast<int>(sizeof(m_propertyLabel) - 1); i++) {
+        full[i] = m_propertyLabel[i];
+      }
+      full[i++] = ':';
+      full[i++] = ' ';
+      int j = 0;
+      for (; m_propertyValue[j] != '\0' && i < static_cast<int>(sizeof(full) - 1); j++) {
+        full[i++] = m_propertyValue[j];
+      }
+      full[i] = '\0';
+      ctx->drawString(full, KDPoint(x, y), KDFont::SmallFont, m_propertyTextColor, m_propertyBgColor);
+      return;
+    }
     ctx->drawString(typeStr, KDPoint(x, y), KDFont::SmallFont, Palette::AtomColorHighlighted[m_type], Palette::BackgroundApps);
   }
   KDSize minimalSizeForOptimalDisplay() const override {
@@ -67,6 +107,11 @@ private:
   bool m_searchActive = false;
   int m_searchCursor = 0;
   char m_searchText[20] = {'\0'};
+  bool m_showProperty = false;
+  char m_propertyLabel[32] = {'\0'};
+  char m_propertyValue[32] = {'\0'};
+  KDColor m_propertyBgColor = KDColor::RGB24(0x000000);
+  KDColor m_propertyTextColor = KDColor::RGB24(0xffffff);
 };
 
 }

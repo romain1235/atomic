@@ -21,7 +21,10 @@ KDColor AtomicCell::colorForType(AtomType type) const {
 void AtomicCell::drawRect(KDContext * ctx, KDRect rect) const {
   if (m_visible) {
     KDColor color = colorForType(m_atom.type);
-    KDColor textColor = Palette::AtomColorHighlighted[m_atom.type];
+    if (m_hasCustomColor) {
+      color = m_customColor;
+    }
+    KDColor textColor = m_hasCustomTextColor ? m_customTextColor : Palette::AtomColorHighlighted[m_atom.type];
     if (m_searchActive && !m_searchMatch) {
       color = Palette::BackgroundAppsSecondary;
       textColor = Palette::SecondaryText;
@@ -83,6 +86,36 @@ void AtomicCell::setSearchState(bool searchActive, bool isMatch) {
 
 void AtomicCell::reloadCell() {
   markRectAsDirty(bounds());
+}
+
+void AtomicCell::setCustomColor(KDColor color) {
+  if (!m_hasCustomColor || m_customColor != color) {
+    m_hasCustomColor = true;
+    m_customColor = color;
+    markRectAsDirty(bounds());
+  }
+}
+
+void AtomicCell::clearCustomColor() {
+  if (m_hasCustomColor) {
+    m_hasCustomColor = false;
+    markRectAsDirty(bounds());
+  }
+}
+
+void AtomicCell::setCustomTextColor(KDColor color) {
+  if (!m_hasCustomTextColor || m_customTextColor != color) {
+    m_hasCustomTextColor = true;
+    m_customTextColor = color;
+    markRectAsDirty(bounds());
+  }
+}
+
+void AtomicCell::clearCustomTextColor() {
+  if (m_hasCustomTextColor) {
+    m_hasCustomTextColor = false;
+    markRectAsDirty(bounds());
+  }
 }
 
 

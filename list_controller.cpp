@@ -1,4 +1,5 @@
 #include "list_controller.h"
+#include "table_controller.h"
 #include <poincare_layouts.h>
 #include <poincare_nodes.h>
 #include <poincare/float.h>
@@ -42,11 +43,38 @@ ListController::ListController(Responder * parentResponder) :
 }
 
 bool ListController::handleEvent(Ion::Events::Event event) {
-  
   if (event == Ion::Events::Right || event == Ion::Events::Left) {
     return m_parent->handleEvent(event);
   }
-  
+
+  if (event == Ion::Events::OK || event == Ion::Events::EXE) {
+    int focusRow = selectedRow();
+    TableController * parentTC = reinterpret_cast<TableController *>(m_parent);
+    // Map rows to properties: 2=num, 3=neutrons, 4=types, 5=mass, 6=electroneg
+    if (focusRow >= 2 && focusRow <= 6) {
+      Container::activeApp()->dismissModalViewController();
+      switch (focusRow) {
+        case 2:
+          parentTC->setColorProperty(TableController::ColorByAtomicNumber);
+          break;
+        case 3:
+          parentTC->setColorProperty(TableController::ColorByNeutrons);
+          break;
+        case 4:
+          parentTC->clearColorProperty();
+          break;
+        case 5:
+          parentTC->setColorProperty(TableController::ColorByMass);
+          break;
+        case 6:
+          parentTC->setColorProperty(TableController::ColorByElectronegativity);
+          break;
+      }
+      parentTC->reloadTableData();
+      return true;
+    }
+  }
+
   return false;
 }
 

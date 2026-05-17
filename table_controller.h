@@ -2,7 +2,6 @@
 #define ATOMIC_TABLE_CONTROLLER_H
 
 #include <escher.h>
-#include "../shared/ok_view.h"
 #include "atomic_cell.h"
 #include "atom_info.h"
 #include "table_lines_view.h"
@@ -21,6 +20,18 @@ public:
   bool handleEvent(Ion::Events::Event event) override;
   void didBecomeFirstResponder() override;
   TELEMETRY_ID("");
+
+  enum ColorProperty {
+    ColorByType = 0,
+    ColorByAtomicNumber,
+    ColorByNeutrons,
+    ColorByMass,
+    ColorByElectronegativity
+  };
+
+  void setColorProperty(ColorProperty p);
+  void clearColorProperty();
+  void reloadTableData();
 
   int numberOfRows() const override;
   int numberOfColumns() const override;
@@ -49,12 +60,13 @@ private:
     void setAtom(AtomDef atom);
     void setSearchInput(bool active, const char * text, int cursor);
     void setInfoVisible(bool visible);
+    void setPropertyDisplay(const char * label, const char * value, KDColor bgColor, KDColor textColor);
+    void clearPropertyDisplay();
   private:
     int numberOfSubviews() const override;
     View * subviewAtIndex(int index) override;
     void layoutSubviews(bool force = false) override;
     SelectableTableView m_selectableTableView;
-    Shared::OkView m_ok;
     atomInfo m_info;
     tableLinesView m_lines;
     TypeFooterView m_typeFooter;
@@ -80,6 +92,10 @@ private:
   int m_cursor = 0;
   ListController m_list;
   bool m_menuIsOpen = false;
+  ColorProperty m_colorProperty = ColorByType;
+  bool m_coloringActive = false;
+  double m_propertyMin = 0.0;
+  double m_propertyMax = 0.0;
 };
 
 }
