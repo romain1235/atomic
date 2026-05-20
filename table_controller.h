@@ -26,12 +26,18 @@ public:
     ColorByAtomicNumber,
     ColorByNeutrons,
     ColorByMass,
-    ColorByElectronegativity
+    ColorByElectronegativity,
+    ColorByAtomicRadius,
+    ColorByElectronAffinity,
+    ColorByMeltingPoint,
+    ColorByBoilingPoint,
+    ColorByDensity
   };
 
   void setColorProperty(ColorProperty p);
   void clearColorProperty();
   void reloadTableData();
+  bool moveCursorInMenu(int direction);
 
   int numberOfRows() const override;
   int numberOfColumns() const override;
@@ -49,6 +55,7 @@ private:
   void refreshSearchResults();
   int nextSearchResultIndex(int direction) const;
   int scoreForSearch(const AtomDef & atom, const char * query, int queryLength, bool isNumeric) const;
+  void updateFooterPropertyDisplay(int atomIndex, bool force = false);
   static bool startsWithIgnoreCase(const char * text, const char * query);
   static bool isNumericString(const char * text);
   StackViewController * stackController() const;
@@ -96,6 +103,15 @@ private:
   bool m_coloringActive = false;
   double m_propertyMin = 0.0;
   double m_propertyMax = 0.0;
+  // Cache for precomputed colors when a property is active
+  KDColor m_precomputedBg[k_maxNumberOfCells];
+  KDColor m_precomputedText[k_maxNumberOfCells];
+  bool m_precomputedColorsValid = false;
+  bool m_footerDisplayValid = false;
+  const char * m_lastFooterLabel = nullptr;
+  char m_lastFooterValue[32] = "";
+  KDColor m_lastFooterBg = KDColor::RGB24(0);
+  KDColor m_lastFooterFg = KDColor::RGB24(0);
 };
 
 }

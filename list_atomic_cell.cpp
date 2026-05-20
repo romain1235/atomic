@@ -17,6 +17,12 @@ void ListAtomicCell::drawRect(KDContext * ctx, KDRect rect) const {
   // Couleurs
   KDColor color = Palette::AtomColor[m_atom.type];
   KDColor highlighted = Palette::AtomColorHighlighted[m_atom.type];
+  if (m_hasCustomColor) {
+    color = m_customColor;
+  }
+  if (m_hasCustomTextColor) {
+    highlighted = m_customTextColor;
+  }
 
   // Carré principal (50x50 centré verticalement)
   int squareSize = 50;
@@ -26,14 +32,10 @@ void ListAtomicCell::drawRect(KDContext * ctx, KDRect rect) const {
   ctx->strokeRect(KDRect(squareX, squareY, squareSize, squareSize), highlighted);
 
   // Z (protons) et A (nucléons)
-  char nucleons[4];
-  Poincare::Integer(m_atom.num + m_atom.neutrons).serialize(nucleons, 4);
-  char protons[4];
-  Poincare::Integer(m_atom.num).serialize(protons, 4);
-
-  KDSize nucleonsSize = KDFont::SmallFont->stringSize(nucleons);
-  KDSize protonsSize = KDFont::SmallFont->stringSize(protons);
-  KDSize symbolSize = KDFont::LargeFont->stringSize(m_atom.symbol);
+  // Use cached serialized strings and sizes prepared in setAtom
+  KDSize nucleonsSize = m_nucleonsSize;
+  KDSize protonsSize = m_protonsSize;
+  KDSize symbolSize = m_symbolSize;
 
   int totalWidth = std::max(nucleonsSize.width(), protonsSize.width()) + symbolSize.width();
   int nucleonsPosition = squareX + (squareSize - totalWidth + std::max(nucleonsSize.width(), protonsSize.width()) - nucleonsSize.width()) / 2;
@@ -45,9 +47,9 @@ void ListAtomicCell::drawRect(KDContext * ctx, KDRect rect) const {
   int symbolY = squareY + (squareSize - symbolSize.height()) / 2;
 
   // Dessin A (nucléons)
-  ctx->drawString(nucleons, KDPoint(nucleonsPosition, nucleonsY), KDFont::SmallFont, highlighted, color);
+  ctx->drawString(m_nucleonsText, KDPoint(nucleonsPosition, nucleonsY), KDFont::SmallFont, highlighted, color);
   // Dessin Z (protons)
-  ctx->drawString(protons, KDPoint(protonsPosition, protonsY), KDFont::SmallFont, highlighted, color);
+  ctx->drawString(m_protonsText, KDPoint(protonsPosition, protonsY), KDFont::SmallFont, highlighted, color);
   // Dessin symbole
   ctx->drawString(m_atom.symbol, KDPoint(symbolPosition, symbolY), KDFont::LargeFont, highlighted, color);
 
@@ -60,7 +62,46 @@ View * ListAtomicCell::subviewAtIndex(int index) {
 
 void ListAtomicCell::setAtom(AtomDef atom) {
   m_atom = atom;
+  // Precompute serialized texts and sizes to avoid work in drawRect
+  Poincare::Integer(m_atom.num + m_atom.neutrons).serialize(m_nucleonsText, sizeof(m_nucleonsText));
+  Poincare::Integer(m_atom.num).serialize(m_protonsText, sizeof(m_protonsText));
+  m_nucleonsSize = KDFont::SmallFont->stringSize(m_nucleonsText);
+  m_protonsSize = KDFont::SmallFont->stringSize(m_protonsText);
+  m_symbolSize = KDFont::LargeFont->stringSize(m_atom.symbol);
+  // Reset custom colors when changing atom
+  m_hasCustomColor = false;
+  m_hasCustomTextColor = false;
   markRectAsDirty(bounds());
+}
+
+void ListAtomicCell::setCustomColor(KDColor color) {
+  if (!m_hasCustomColor || m_customColor != color) {
+    m_hasCustomColor = true;
+    m_customColor = color;
+    markRectAsDirty(bounds());
+  }
+}
+
+void ListAtomicCell::clearCustomColor() {
+  if (m_hasCustomColor) {
+    m_hasCustomColor = false;
+    markRectAsDirty(bounds());
+  }
+}
+
+void ListAtomicCell::setCustomTextColor(KDColor color) {
+  if (!m_hasCustomTextColor || m_customTextColor != color) {
+    m_hasCustomTextColor = true;
+    m_customTextColor = color;
+    markRectAsDirty(bounds());
+  }
+}
+
+void ListAtomicCell::clearCustomTextColor() {
+  if (m_hasCustomTextColor) {
+    m_hasCustomTextColor = false;
+    markRectAsDirty(bounds());
+  }
 }
 
 KDRect ListAtomicCell::m_atomRect() const {

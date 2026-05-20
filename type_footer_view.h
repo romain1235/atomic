@@ -43,7 +43,7 @@ public:
       m_propertyValue[j] = value[j];
     }
     m_propertyValue[j] = '\0';
-    m_propertyBgColor = Palette::BackgroundApps;
+    m_propertyBgColor = bgColor;
     m_propertyTextColor = textColor;
     markRectAsDirty(bounds());
   }
@@ -81,20 +81,51 @@ public:
     int y = bounds().height() - typeSize.height() - 4;
     // If a property is shown, display it instead of the type
     if (m_showProperty) {
-      ctx->fillRect(bounds(), m_propertyBgColor);
-      char full[64];
-      int i = 0;
-      for (; m_propertyLabel[i] != '\0' && i < static_cast<int>(sizeof(m_propertyLabel) - 1); i++) {
-        full[i] = m_propertyLabel[i];
+      ctx->fillRect(bounds(), Palette::BackgroundApps);
+      // Draw label + ':'
+      char labelWithColon[40];
+      int li = 0;
+      for (; m_propertyLabel[li] != '\0' && li < static_cast<int>(sizeof(labelWithColon) - 2); li++) {
+        labelWithColon[li] = m_propertyLabel[li];
       }
-      full[i++] = ':';
-      full[i++] = ' ';
-      int j = 0;
-      for (; m_propertyValue[j] != '\0' && i < static_cast<int>(sizeof(full) - 1); j++) {
-        full[i++] = m_propertyValue[j];
+      labelWithColon[li++] = ':';
+      labelWithColon[li] = '\0';
+      KDSize labelSize = KDFont::SmallFont->stringSize(labelWithColon);
+      ctx->drawString(labelWithColon, KDPoint(x, y), KDFont::SmallFont, m_propertyTextColor, Palette::BackgroundApps);
+
+      // Draw value, possibly with '^' exponent marker (e.g. "g·mol^-1")
+      // Split base and exponent at '^' if present
+      char base[48];
+      char exponent[16];
+      int bi = 0;
+      int ei = 0;
+      bool hasCaret = false;
+      for (int j = 0; m_propertyValue[j] != '\0' && j < static_cast<int>(sizeof(m_propertyValue)); j++) {
+        if (m_propertyValue[j] == '^') {
+          hasCaret = true;
+          int k = j + 1;
+          while (m_propertyValue[k] != '\0' && ei < static_cast<int>(sizeof(exponent) - 1)) {
+            exponent[ei++] = m_propertyValue[k++];
+          }
+          exponent[ei] = '\0';
+          break;
+        }
+        if (bi < static_cast<int>(sizeof(base) - 1)) {
+          base[bi++] = m_propertyValue[j];
+        }
       }
-      full[i] = '\0';
-      ctx->drawString(full, KDPoint(x, y), KDFont::SmallFont, m_propertyTextColor, m_propertyBgColor);
+      base[bi] = '\0';
+
+      KDCoordinate valueX = x + labelSize.width() + 4;
+      if (!hasCaret) {
+        ctx->drawString(base, KDPoint(valueX, y), KDFont::SmallFont, m_propertyTextColor, Palette::BackgroundApps);
+        return;
+      }
+      // Draw base then exponent shifted up
+      KDSize baseSize = KDFont::SmallFont->stringSize(base);
+      ctx->drawString(base, KDPoint(valueX, y), KDFont::SmallFont, m_propertyTextColor, Palette::BackgroundApps);
+      int supShift = KDFont::SmallFont->glyphSize().height() / 2;
+      ctx->drawString(exponent, KDPoint(valueX + baseSize.width(), y - supShift), KDFont::SmallFont, m_propertyTextColor, Palette::BackgroundApps);
       return;
     }
     ctx->drawString(typeStr, KDPoint(x, y), KDFont::SmallFont, Palette::AtomColorHighlighted[m_type], Palette::BackgroundApps);

@@ -45,17 +45,10 @@ void atomInfo::drawRect(KDContext * ctx, KDRect rect) const {
   ctx->strokeRect(KDRect(rect.left(), rect.top(), 50, 50), highlighted);
 
 
-  // Get the number of nucleons and protons
-  char nucleons[4];
-  Poincare::Integer(m_atom.num + m_atom.neutrons).serialize(nucleons, 4);
-
-  char protons[4];
-  Poincare::Integer(m_atom.num).serialize(protons, 4);
-
-  // Get the size of the nucleons, protons and symbol strings
-  KDSize nucleonsSize = KDFont::SmallFont->stringSize(nucleons);
-  KDSize protonsSize = KDFont::SmallFont->stringSize(protons);
-  KDSize symbolSize = KDFont::LargeFont->stringSize(m_atom.symbol);
+  // Use cached serialized strings and sizes prepared in setAtom
+  KDSize nucleonsSize = m_nucleonsSize;
+  KDSize protonsSize = m_protonsSize;
+  KDSize symbolSize = m_symbolSize;
 
 
   // Compute the position of the nucleons, protons and symbol strings to center them
@@ -74,25 +67,15 @@ void atomInfo::drawRect(KDContext * ctx, KDRect rect) const {
 
   // Draw the number of nucleons
   KDPoint coordonates(nucleonsPosition, nucleonsY);
-  ctx->drawString(nucleons, coordonates, KDFont::SmallFont, highlighted, color);
+  ctx->drawString(m_nucleonsText, coordonates, KDFont::SmallFont, highlighted, color);
 
   // Draw the number of protons
   coordonates = KDPoint(protonsPosition, protonsY);
-  ctx->drawString(protons, coordonates, KDFont::SmallFont, highlighted, color);
+  ctx->drawString(m_protonsText, coordonates, KDFont::SmallFont, highlighted, color);
   // Draw the symbol of the atom
   coordonates = KDPoint(symbolPosition, symbolY);
   ctx->drawString(m_atom.symbol, coordonates, KDFont::LargeFont, highlighted, color);
-
-
-  // Get the y position of the mass
-  int nameY = (50 - KDFont::SmallFont->glyphSize().height() * 2) / 2;
-  int massY = nameY + KDFont::SmallFont->glyphSize().height();
-
-  // Draw the mass of the atom
-  char mass[12];
-  Poincare::Number::FloatNumber(m_atom.mass).serialize(mass, 12, Poincare::Preferences::PrintFloatMode::Decimal, 12);
-  coordonates = KDPoint(bounds().left() + 60, massY);
-  ctx->drawString(mass, coordonates, KDFont::SmallFont, m_hasCustomColors ? m_customText : Palette::AtomText, Palette::BackgroundApps);
+ 
 }
 
 int atomInfo::numberOfSubviews() const {
@@ -113,6 +96,12 @@ void atomInfo::layoutSubviews(bool force) {
 void atomInfo::setAtom(AtomDef atom) {
   m_atom = atom;
   m_atomName.setMessage(atom.name);
+  // Precompute serialized nucleons/protons and sizes to avoid work in drawRect
+  Poincare::Integer(m_atom.num + m_atom.neutrons).serialize(m_nucleonsText, sizeof(m_nucleonsText));
+  Poincare::Integer(m_atom.num).serialize(m_protonsText, sizeof(m_protonsText));
+  m_nucleonsSize = KDFont::SmallFont->stringSize(m_nucleonsText);
+  m_protonsSize = KDFont::SmallFont->stringSize(m_protonsText);
+  m_symbolSize = KDFont::LargeFont->stringSize(m_atom.symbol);
   markRectAsDirty(bounds());
 }
 

@@ -24,6 +24,11 @@ private:
   bool m_hasCustomColors = false;
   KDColor m_customBg;
   KDColor m_customText;
+  char m_nucleonsText[4] = {'\0'};
+  char m_protonsText[4] = {'\0'};
+  KDSize m_nucleonsSize = KDSizeZero;
+  KDSize m_protonsSize = KDSizeZero;
+  KDSize m_symbolSize = KDSizeZero;
 };
 
 }

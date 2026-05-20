@@ -3,6 +3,7 @@
 #include <poincare_layouts.h>
 #include <poincare_nodes.h>
 #include <poincare/float.h>
+#include <string.h>
 
 namespace Atomic {
 
@@ -10,9 +11,8 @@ ListController::InnerView::InnerView(ListController * dataSource) :
   ViewController(dataSource),
   m_selectableTableView(this, dataSource, dataSource, dataSource)
 {
-  m_selectableTableView.setMargins(0);
-  m_selectableTableView.setDecoratorType(ScrollView::Decorator::Type::None);
-  m_selectableTableView.setMargins(0,0,0,0);
+  m_selectableTableView.setDecoratorType(ScrollView::Decorator::Type::Bars);
+  m_selectableTableView.setMargins(0, 13, 0, 0);
 }
 
 void ListController::InnerView::setAtom(AtomDef atom) {
@@ -44,7 +44,8 @@ ListController::ListController(Responder * parentResponder) :
 
 bool ListController::handleEvent(Ion::Events::Event event) {
   if (event == Ion::Events::Right || event == Ion::Events::Left) {
-    return m_parent->handleEvent(event);
+    TableController * parentTC = reinterpret_cast<TableController *>(m_parent);
+    return parentTC->moveCursorInMenu(event == Ion::Events::Right ? 1 : -1);
   }
 
   if (event == Ion::Events::OK || event == Ion::Events::EXE) {
@@ -73,6 +74,29 @@ bool ListController::handleEvent(Ion::Events::Event event) {
       parentTC->reloadTableData();
       return true;
     }
+    // New property rows (after Electronical row) -> 8..12
+    if (focusRow >= 8 && focusRow <= 12) {
+      Container::activeApp()->dismissModalViewController();
+      switch (focusRow) {
+        case 8:
+          parentTC->setColorProperty(TableController::ColorByAtomicRadius);
+          break;
+        case 9:
+          parentTC->setColorProperty(TableController::ColorByElectronAffinity);
+          break;
+        case 10:
+          parentTC->setColorProperty(TableController::ColorByMeltingPoint);
+          break;
+        case 11:
+          parentTC->setColorProperty(TableController::ColorByBoilingPoint);
+          break;
+        case 12:
+          parentTC->setColorProperty(TableController::ColorByDensity);
+          break;
+      }
+      parentTC->reloadTableData();
+      return true;
+    }
   }
 
   return false;
@@ -81,6 +105,20 @@ bool ListController::handleEvent(Ion::Events::Event event) {
 void ListController::didBecomeFirstResponder() {
   selectCellAtLocation(0, 0);
   Container::activeApp()->setFirstResponder(&m_innerView);
+}
+
+void ListController::setPropertyColors(KDColor bg, KDColor text) {
+  m_propertyBg = bg;
+  m_propertyText = text;
+  m_hasPropertyColors = true;
+  m_innerView.selectableTableView()->reloadData(false);
+}
+
+void ListController::clearPropertyColors() {
+  if (m_hasPropertyColors) {
+    m_hasPropertyColors = false;
+    m_innerView.selectableTableView()->reloadData(false);
+  }
 }
 
 int ListController::numberOfRows() const {
@@ -177,6 +215,13 @@ void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
   switch (index) {
     case 0 : {
       m_atomicCell.setAtom(m_atom);
+      if (m_hasPropertyColors) {
+        m_atomicCell.setCustomColor(m_propertyBg);
+        m_atomicCell.setCustomTextColor(m_propertyText);
+      } else {
+        m_atomicCell.clearCustomColor();
+        m_atomicCell.clearCustomTextColor();
+      }
       return;
     }
     case 1: {
@@ -208,12 +253,26 @@ void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
     case 5: {
       MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
       myCell->setMessage(I18n::Message::AtomMass);
-      myCell->setLayoutWithCopy(Poincare::FloatNode<double>(m_atom.mass).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 7));
+      if (m_atom.mass < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
+      Poincare::Layout numLayout = Poincare::FloatNode<double>(m_atom.mass).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 7);
+      // Build unit layout: " g·mol" with superscript -1 (small font)
+      Poincare::Layout unitBase = Poincare::LayoutHelper::String(" g·mol", strlen(" g·mol"), KDFont::SmallFont);
+      Poincare::Layout unitExp = Poincare::VerticalOffsetLayout::Builder(Poincare::LayoutHelper::String("-1", 2, KDFont::SmallFont), Poincare::VerticalOffsetLayoutNode::Position::Superscript);
+      Poincare::Layout unitLayout = Poincare::HorizontalLayout::Builder(unitBase, unitExp);
+      Poincare::HorizontalLayout fullLayout = Poincare::HorizontalLayout::Builder(numLayout, unitLayout);
+      myCell->setLayoutWithCopy(fullLayout);
       return;
     }
     case 6: {
       MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
       myCell->setMessage(I18n::Message::AtomElectroneg);
+      if (m_atom.electroneg < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
       myCell->setLayoutWithCopy(Poincare::FloatNode<double>(m_atom.electroneg).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 5));
       return;
     }
@@ -221,6 +280,70 @@ void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
       MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
       myCell->setMessage(I18n::Message::AtomEC);
       myCell->setLayoutWithCopy(Electronical::createElectronical(m_atom));
+      return;
+    }
+    case 8: {
+      MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
+      myCell->setMessage(I18n::Message::AtomAtomicRadius);
+      if (m_atom.atomicRadius < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
+      Poincare::Layout numLayoutAR = Poincare::FloatNode<double>(m_atom.atomicRadius).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 3);
+      Poincare::HorizontalLayout fullLayoutAR = Poincare::HorizontalLayout::Builder(numLayoutAR, Poincare::LayoutHelper::String(" pm", strlen(" pm"), KDFont::SmallFont));
+      myCell->setLayoutWithCopy(fullLayoutAR);
+      return;
+    }
+    case 9: {
+      MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
+      myCell->setMessage(I18n::Message::AtomElectronAffinity);
+      if (m_atom.electronAffinity < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
+      Poincare::Layout numLayoutEA = Poincare::FloatNode<double>(m_atom.electronAffinity).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 5);
+      Poincare::HorizontalLayout fullLayoutEA = Poincare::HorizontalLayout::Builder(numLayoutEA, Poincare::LayoutHelper::String(" eV", strlen(" eV"), KDFont::SmallFont));
+      myCell->setLayoutWithCopy(fullLayoutEA);
+      return;
+    }
+    case 10: {
+      MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
+      myCell->setMessage(I18n::Message::AtomMeltingPoint);
+      if (m_atom.meltingPoint < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
+      Poincare::Layout numLayoutM = Poincare::Integer(static_cast<int>(m_atom.meltingPoint)).createLayout();
+      Poincare::HorizontalLayout fullLayoutM = Poincare::HorizontalLayout::Builder(numLayoutM, Poincare::LayoutHelper::String(" K", strlen(" K"), KDFont::SmallFont));
+      myCell->setLayoutWithCopy(fullLayoutM);
+      return;
+    }
+    case 11: {
+      MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
+      myCell->setMessage(I18n::Message::AtomBoilingPoint);
+      if (m_atom.boilingPoint < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
+      Poincare::Layout numLayoutB = Poincare::Integer(static_cast<int>(m_atom.boilingPoint)).createLayout();
+      Poincare::HorizontalLayout fullLayoutB = Poincare::HorizontalLayout::Builder(numLayoutB, Poincare::LayoutHelper::String(" K", strlen(" K"), KDFont::SmallFont));
+      myCell->setLayoutWithCopy(fullLayoutB);
+      return;
+    }
+    case 12: {
+      MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
+      myCell->setMessage(I18n::Message::AtomDensity);
+      if (m_atom.density < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
+      Poincare::Layout numLayoutD = Poincare::FloatNode<double>(m_atom.density).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 6);
+      // Build unit layout: " g·cm" with superscript -3
+      Poincare::Layout unitBaseD = Poincare::LayoutHelper::String(" g·cm", strlen(" g·cm"), KDFont::SmallFont);
+      Poincare::Layout unitExpD = Poincare::VerticalOffsetLayout::Builder(Poincare::LayoutHelper::String("-3", 2, KDFont::SmallFont), Poincare::VerticalOffsetLayoutNode::Position::Superscript);
+      Poincare::Layout unitLayoutD = Poincare::HorizontalLayout::Builder(unitBaseD, unitExpD);
+      Poincare::HorizontalLayout fullLayoutD = Poincare::HorizontalLayout::Builder(numLayoutD, unitLayoutD);
+      myCell->setLayoutWithCopy(fullLayoutD);
       return;
     }
     default: {

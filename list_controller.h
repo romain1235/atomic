@@ -23,6 +23,8 @@ public:
 
   void setAtom(AtomDef atom);
   void unhighlightTopCells();
+  void setPropertyColors(KDColor bg, KDColor text);
+  void clearPropertyColors();
 
   void tableViewDidChangeSelection(SelectableTableView * t, int previousSelectedCellX, int previousSelectedCellY, bool withinTemporarySelection) override;
 
@@ -78,12 +80,16 @@ private:
   ListAtomicCell m_atomicCell;
   constexpr static int k_numberOfCellsWithBuffer = 2;
   MessageTableCellWithBuffer m_cellsWithBuffer[k_numberOfCellsWithBuffer];
-  constexpr static int k_numberOfCellsWithExpression = 5;
+  constexpr static int k_numberOfCellsWithExpression = 10;
   MessageTableCellWithExpressionWithCopy m_cellsWithExpression[k_numberOfCellsWithExpression];
   constexpr static int k_numberOfRow = 1 + k_numberOfCellsWithBuffer + k_numberOfCellsWithExpression;
   InnerView m_innerView;
   AtomDef m_atom;
   Responder* m_parent;
+  // Optional property colors to apply to the atomic preview cell
+  bool m_hasPropertyColors = false;
+  KDColor m_propertyBg = KDColor::RGB24(0x000000);
+  KDColor m_propertyText = KDColor::RGB24(0xffffff);
 };
 
 }
