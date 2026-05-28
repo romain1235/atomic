@@ -83,8 +83,13 @@ static char nextFoldedSearchChar(const char ** text) {
 struct PropertyDisplayData {
   const char * label;
   char value[32];
-  KDColor propertyColor;
-  KDColor propertyColorHighlighted;
+  // Renamed: the palette entries represent the "max" color; we also
+  // compute a "min" color (slightly tinted toward the theme) for the
+  // gradient.
+  KDColor propertyColorMax;
+  KDColor propertyColorMaxHighlighted;
+  KDColor propertyColorMin;
+  KDColor propertyColorMinHighlighted;
   double valueForColor;
 };
 
@@ -94,6 +99,8 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
     "",
     Palette::AtomColor[a.type],
     Palette::AtomColorHighlighted[a.type],
+    Palette::BackgroundAppsSecondary,
+    Palette::SecondaryText,
     -1
   };
 
@@ -101,15 +108,19 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
     case TableController::ColorByAtomicNumber:
       data.label = I18n::translate(I18n::Message::AtomNum);
       Poincare::Integer(a.num).serialize(data.value, sizeof(data.value));
-      data.propertyColor = Palette::AtomPropertyNum;
-      data.propertyColorHighlighted = Palette::AtomPropertyNumHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyNum;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyNumHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyNumMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyNumMinHighlighted;
       data.valueForColor = a.num;
       break;
     case TableController::ColorByNeutrons:
       data.label = I18n::translate(I18n::Message::AtomNeutrons);
       Poincare::Integer(a.neutrons).serialize(data.value, sizeof(data.value));
-      data.propertyColor = Palette::AtomPropertyNeutrons;
-      data.propertyColorHighlighted = Palette::AtomPropertyNeutronsHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyNeutrons;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyNeutronsHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyNeutronsMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyNeutronsMinHighlighted;
       data.valueForColor = a.neutrons;
       break;
     case TableController::ColorByMass:
@@ -122,8 +133,10 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
         strlcpy(data.value, tmp, sizeof(data.value));
         strlcat(data.value, " g·mol^-1", sizeof(data.value));
       }
-      data.propertyColor = Palette::AtomPropertyMass;
-      data.propertyColorHighlighted = Palette::AtomPropertyMassHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyMass;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyMassHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyMassMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyMassMinHighlighted;
       data.valueForColor = a.mass;
       break;
     case TableController::ColorByElectronegativity:
@@ -133,8 +146,10 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
       } else {
         Poincare::Number::FloatNumber(a.electroneg).serialize(data.value, sizeof(data.value), Poincare::Preferences::PrintFloatMode::Decimal, 2);
       }
-      data.propertyColor = Palette::AtomPropertyElectroneg;
-      data.propertyColorHighlighted = Palette::AtomPropertyElectronegHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyElectroneg;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyElectronegHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyElectronegMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyElectronegMinHighlighted;
       data.valueForColor = a.electroneg;
       break;
     case TableController::ColorByAtomicRadius:
@@ -145,8 +160,10 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
         Poincare::Integer(static_cast<int>(a.atomicRadius)).serialize(data.value, sizeof(data.value));
         strlcat(data.value, " pm", sizeof(data.value));
       }
-      data.propertyColor = Palette::AtomPropertyAtomicRadius;
-      data.propertyColorHighlighted = Palette::AtomPropertyAtomicRadiusHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyAtomicRadius;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyAtomicRadiusHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyAtomicRadiusMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyAtomicRadiusMinHighlighted;
       data.valueForColor = a.atomicRadius;
       break;
     case TableController::ColorByElectronAffinity:
@@ -159,9 +176,27 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
         strlcpy(data.value, tmp, sizeof(data.value));
         strlcat(data.value, " eV", sizeof(data.value));
       }
-      data.propertyColor = Palette::AtomPropertyElectronAffinity;
-      data.propertyColorHighlighted = Palette::AtomPropertyElectronAffinityHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyElectronAffinity;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyElectronAffinityHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyElectronAffinityMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyElectronAffinityMinHighlighted;
       data.valueForColor = a.electronAffinity;
+      break;
+    case TableController::ColorByIonisation:
+      data.label = I18n::translate(I18n::Message::AtomIonisation);
+      if (a.ionisation < 0) {
+        strlcpy(data.value, "N/A", sizeof(data.value));
+      } else {
+        char tmp[32];
+        Poincare::Number::FloatNumber(a.ionisation).serialize(tmp, sizeof(tmp), Poincare::Preferences::PrintFloatMode::Decimal, 3);
+        strlcpy(data.value, tmp, sizeof(data.value));
+        strlcat(data.value, " eV", sizeof(data.value));
+      }
+      data.propertyColorMax = Palette::AtomPropertyIonisation;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyIonisationHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyIonisationMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyIonisationMinHighlighted;
+      data.valueForColor = a.ionisation;
       break;
     case TableController::ColorByMeltingPoint:
       data.label = I18n::translate(I18n::Message::AtomMeltingPoint);
@@ -171,8 +206,10 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
         Poincare::Integer(static_cast<int>(a.meltingPoint)).serialize(data.value, sizeof(data.value));
         strlcat(data.value, " K", sizeof(data.value));
       }
-      data.propertyColor = Palette::AtomPropertyMeltingPoint;
-      data.propertyColorHighlighted = Palette::AtomPropertyMeltingPointHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyMeltingPoint;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyMeltingPointHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyMeltingPointMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyMeltingPointMinHighlighted;
       data.valueForColor = a.meltingPoint;
       break;
     case TableController::ColorByBoilingPoint:
@@ -183,8 +220,10 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
         Poincare::Integer(static_cast<int>(a.boilingPoint)).serialize(data.value, sizeof(data.value));
         strlcat(data.value, " K", sizeof(data.value));
       }
-      data.propertyColor = Palette::AtomPropertyBoilingPoint;
-      data.propertyColorHighlighted = Palette::AtomPropertyBoilingPointHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyBoilingPoint;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyBoilingPointHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyBoilingPointMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyBoilingPointMinHighlighted;
       data.valueForColor = a.boilingPoint;
       break;
     case TableController::ColorByDensity:
@@ -197,19 +236,25 @@ static PropertyDisplayData propertyDisplayDataForAtom(const AtomDef & a, TableCo
         strlcpy(data.value, tmp, sizeof(data.value));
         strlcat(data.value, " g·cm^-3", sizeof(data.value));
       }
-      data.propertyColor = Palette::AtomPropertyDensity;
-      data.propertyColorHighlighted = Palette::AtomPropertyDensityHighlighted;
+      data.propertyColorMax = Palette::AtomPropertyDensity;
+      data.propertyColorMaxHighlighted = Palette::AtomPropertyDensityHighlighted;
+      data.propertyColorMin = Palette::AtomPropertyDensityMin;
+      data.propertyColorMinHighlighted = Palette::AtomPropertyDensityMinHighlighted;
       data.valueForColor = a.density;
       break;
     default:
       break;
   }
 
+  // `propertyColorMin` / `propertyColorMinHighlighted` are set per-property above
+
   return data;
 }
 
-TableController::ContentView::ContentView(TableController * controller, SelectableTableViewDataSource * selectionDataSource) :
-  m_selectableTableView(controller, controller, selectionDataSource, controller)
+TableController::ContentView::ContentView(TableController * controller, SelectableTableViewDataSource * selectionDataSource, TextField * searchField) :
+  m_selectableTableView(controller, controller, selectionDataSource, controller),
+  m_searchFieldPtr(searchField),
+  m_searchVisible(false)
 {
   m_selectableTableView.setVerticalCellOverlap(-1);
   m_selectableTableView.setHorizontalCellOverlap(-1);
@@ -227,7 +272,7 @@ void TableController::ContentView::drawRect(KDContext * ctx, KDRect rect) const 
 }
 
 int TableController::ContentView::numberOfSubviews() const {
-  return 4;
+  return 6;
 }
 
 View * TableController::ContentView::subviewAtIndex(int index) {
@@ -235,11 +280,15 @@ View * TableController::ContentView::subviewAtIndex(int index) {
     case 0:
       return &m_selectableTableView;
     case 1:
-      return &m_info;
+      return &m_cursor;
     case 2:
-      return &m_lines;
+      return &m_info;
     case 3:
+      return &m_lines;
+    case 4:
       return &m_typeFooter;
+    case 5:
+      return m_searchFieldPtr;
     default:
       assert(false);
       return nullptr;
@@ -247,11 +296,18 @@ View * TableController::ContentView::subviewAtIndex(int index) {
 }
 
 void TableController::ContentView::layoutSubviews(bool force) {
-  m_selectableTableView.setFrame(KDRect(bounds().top(), bounds().left() + 20 , bounds().width(), bounds().height() - 20), force);
+  m_selectableTableView.setFrame(KDRect(bounds().left(), bounds().top() + 20 , bounds().width(), bounds().height() - 20), force);
   m_info.setFrame(KDRect(KDPoint(48, 15),m_info.minimalSizeForOptimalDisplay()), force);
   m_lines.setFrame(KDRect(KDPoint(40, 99 + 20), m_lines.minimalSizeForOptimalDisplay()), force);
-  m_typeFooter.setFrame(KDRect(0, bounds().height() - m_typeFooter.minimalSizeForOptimalDisplay().height(),
-    bounds().width(), m_typeFooter.minimalSizeForOptimalDisplay().height()), force);
+  KDCoordinate footerH = m_typeFooter.minimalSizeForOptimalDisplay().height();
+  KDRect footerRect = KDRect(0, bounds().height() - footerH, bounds().width(), footerH);
+  if (m_searchVisible) {
+    m_typeFooter.setFrame(KDRectZero, force);
+    m_searchFieldPtr->setFrame(KDRect(6, footerRect.y() + 2, bounds().width() - 12, footerH - 4), force);
+  } else {
+    m_typeFooter.setFrame(footerRect, force);
+    m_searchFieldPtr->setFrame(KDRectZero, force);
+  }
 }
 
 void TableController::ContentView::setAtom(AtomDef atom) {
@@ -259,8 +315,13 @@ void TableController::ContentView::setAtom(AtomDef atom) {
   m_typeFooter.setType(atom.type);
 }
 
-void TableController::ContentView::setSearchInput(bool active, const char * text, int cursor) {
-  m_typeFooter.setSearchInput(active, text, cursor);
+void TableController::ContentView::setSearchVisible(bool active) {
+  if (m_searchVisible == active) {
+    return;
+  }
+  m_searchVisible = active;
+  layoutSubviews(true);
+  markRectAsDirty(bounds());
 }
 
 void TableController::ContentView::setInfoVisible(bool visible) {
@@ -281,11 +342,23 @@ void TableController::ContentView::clearPropertyDisplay() {
   m_info.clearCustomColors();
 }
 
+void TableController::ContentView::updateCursorFrame(int col, int row, KDColor color) {
+  KDPoint offset = m_selectableTableView.contentOffset();
+  constexpr int tableTop = 20;
+  int x = TableController::k_sideMargin - 1 + col * TableController::k_cellWidth - offset.x();
+  int y = tableTop + TableController::k_sideMargin - 1 + row * TableController::k_cellHeight - offset.y();
+  m_cursor.setColor(color);
+  m_cursor.setFrame(KDRect(x, y, TableController::k_cellWidth + 1, TableController::k_cellHeight + 1), true);
+}
+
+void TableController::ContentView::hideCursor() {
+  m_cursor.setFrame(KDRectZero, true);
+}
+
 TableController::TableController(Responder * parentResponder, SelectableTableViewDataSource * selectionDataSource) :
   ViewController(parentResponder),
-  m_view(this, selectionDataSource),
-  m_searchLength(0),
-  m_searchCursor(0),
+  m_searchField(this, m_searchBuffer, sizeof(m_searchBuffer), sizeof(m_searchBuffer), this, this, KDFont::LargeFont, 0.0f, 0.5f, Palette::PrimaryText, Palette::BackgroundApps),
+  m_view(this, selectionDataSource, &m_searchField),
   m_searchStartCursor(-1),
   m_bestSearchResult(-1),
   m_searchActive(false),
@@ -319,28 +392,36 @@ bool TableController::handleEvent(Ion::Events::Event event) {
     return false;
   }
 
+  if (!m_searchActive && event == Ion::Events::Paste) {
+    m_searchStartCursor = m_cursor;
+    m_searchActive = true;
+    m_searchBuffer[0] = '\0';
+    m_searchField.setEditing(true);
+    m_searchField.reinitDraftTextBuffer();
+    m_view.setSearchVisible(true);
+    m_view.setInfoVisible(true);
+    Container::activeApp()->setFirstResponder(&m_searchField);
+    m_searchField.handleEvent(event);
+    return true;
+  }
+
   if (event.hasText() && strlen(event.text()) == 1) {
     char c = event.text()[0];
     if (isAsciiAlnum(c)) {
-      appendCharacterToSearch(c);
+      if (!m_searchActive) {
+        // Start search mode
+        m_searchStartCursor = m_cursor;
+        m_searchActive = true;
+        m_searchBuffer[0] = '\0';
+        m_searchField.setEditing(true);
+        m_searchField.reinitDraftTextBuffer();
+        m_view.setSearchVisible(true);
+        m_view.setInfoVisible(true);
+        Container::activeApp()->setFirstResponder(&m_searchField);
+      }
+      m_searchField.handleEventWithText(event.text());
       return true;
     }
-  }
-
-  if (event == Ion::Events::Backspace && m_searchLength > 0) {
-    removeCharacterFromSearch();
-    return true;
-  }
-
-  if (m_searchActive && (event == Ion::Events::Left || event == Ion::Events::Right)) {
-    if (event == Ion::Events::Left && m_searchCursor > 0) {
-      m_searchCursor--;
-    }
-    if (event == Ion::Events::Right && m_searchCursor < m_searchLength) {
-      m_searchCursor++;
-    }
-    m_view.setSearchInput(true, m_searchBuffer, m_searchCursor);
-    return true;
   }
 
   if (event == Ion::Events::Right && m_cursor < static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef) - 1)) {
@@ -371,16 +452,12 @@ bool TableController::handleEvent(Ion::Events::Event event) {
     int row = selectionDataSource()->selectedRow();
     int column = selectionDataSource()->selectedColumn();
     if (row > 0) {
-      if (row == 8) {
-        row--;
-      }
-      for(size_t i = 0; i < (sizeof(atomsdefs) / sizeof(AtomDef)); i++) {
-        AtomDef atom = atomsdefs[i];
-        if (atom.x == column && atom.y == row-1) {
-          m_cursor = i;
-          setSelection(atom);
-          return true;
-        }
+      // row 8 (lanthanide/actinide) jumps back to row 6
+      int targetRow = (row == 8) ? 6 : row - 1;
+      int idx = m_atomIndex[column][targetRow];
+      if (idx >= 0) {
+        m_cursor = idx;
+        setSelection(atomsdefs[m_cursor]);
       }
     }
     return true;
@@ -397,16 +474,15 @@ bool TableController::handleEvent(Ion::Events::Event event) {
     int row = selectionDataSource()->selectedRow();
     int column = selectionDataSource()->selectedColumn();
     if (row < 9) {
-      if (row == 6) {row++;}
-      for(size_t i = 0; i < (sizeof(atomsdefs) / sizeof(AtomDef)); i++) {
-        AtomDef atom = atomsdefs[i];
-        if (atom.x == column && atom.y == row+1) {
-          m_cursor = i;
-          setSelection(atom);
-          return true;
-        }
+      // row 6 jumps over the lanthanide/actinide gap to row 8
+      int targetRow = (row == 6) ? 8 : row + 1;
+      int idx = m_atomIndex[column][targetRow];
+      if (idx >= 0) {
+        m_cursor = idx;
+        setSelection(atomsdefs[m_cursor]);
       }
     }
+    return true;
   }
   if (event == Ion::Events::OK || event == Ion::Events::EXE) {
     if (m_searchActive) {
@@ -423,6 +499,8 @@ bool TableController::handleEvent(Ion::Events::Event event) {
       return true;
     }
     m_menuIsOpen = true;
+    // Ensure list has the current atom before pushing
+    m_list.setAtom(atomsdefs[m_cursor]);
     // If a property coloring is active, pass the precomputed colors to the list modal
     if (m_coloringActive && m_precomputedColorsValid) {
       int idx = m_cursor;
@@ -434,7 +512,7 @@ bool TableController::handleEvent(Ion::Events::Event event) {
     } else {
       m_list.clearPropertyColors();
     }
-    Container::activeApp()->displayModalViewController(&m_list, 0.f, 0.f, 0, 0, 0, 0);
+    stackController()->push(&m_list);
     m_list.unhighlightTopCells();
     return true;
   }
@@ -461,13 +539,15 @@ bool TableController::moveCursorInMenu(int direction) {
     m_list.clearPropertyColors();
   }
   updateFooterPropertyDisplay(m_cursor);
-  // Update modal header title to reflect the newly selected atom
-  // If headers are displayed, subview(0) is the StackView for the title bar.
-  View * stackSubview = m_list.view()->subview(0);
-  StackView * stackView = static_cast<StackView *>(stackSubview);
-  if (stackView) {
-    stackView->setNamedController(m_list.topViewController());
+  // Update the app's stack header title for the ListController.
+  // TableController has no title() → 0 stack headers for it.
+  // ListController has title() → its header is at subview(0) of the ControllerView.
+  View * listHeader = stackController()->view()->subview(0);
+  if (listHeader) {
+    static_cast<StackView *>(listHeader)->setNamedController(&m_list);
   }
+  // Re-fire the selection delegate (ensures scroll-to-row-0 for row 1, restores FR)
+  m_list.refreshNavigation();
   return true;
 }
 
@@ -561,6 +641,7 @@ void TableController::setColorProperty(ColorProperty p) {
       case ColorByNeutrons: v = a.neutrons; break;
       case ColorByMass: v = a.mass; break;
       case ColorByElectronegativity: v = a.electroneg; break;
+      case ColorByIonisation: v = a.ionisation; break;
       case ColorByAtomicRadius: v = a.atomicRadius; break;
       case ColorByElectronAffinity: v = a.electronAffinity; break;
       case ColorByMeltingPoint: v = a.meltingPoint; break;
@@ -581,48 +662,76 @@ void TableController::setColorProperty(ColorProperty p) {
   }
   // Precompute colors for each atom for the selected property to avoid blending per-cell during draw
   if (m_coloringActive && m_propertyMax > m_propertyMin) {
-    KDColor propertyColor = KDColor::RGB24(0);
-    KDColor propertyColorHighlighted = KDColor::RGB24(0);
+    KDColor propertyColorMax = KDColor::RGB24(0);
+    KDColor propertyColorMaxHighlighted = KDColor::RGB24(0);
+    KDColor propertyColorMin = KDColor::RGB24(0);
+    KDColor propertyColorMinHighlighted = KDColor::RGB24(0);
     switch (p) {
       case ColorByAtomicNumber:
-        propertyColor = Palette::AtomPropertyNum;
-        propertyColorHighlighted = Palette::AtomPropertyNumHighlighted;
+        propertyColorMax = Palette::AtomPropertyNum;
+        propertyColorMaxHighlighted = Palette::AtomPropertyNumHighlighted;
+        propertyColorMin = Palette::AtomPropertyNumMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyNumMinHighlighted;
         break;
       case ColorByNeutrons:
-        propertyColor = Palette::AtomPropertyNeutrons;
-        propertyColorHighlighted = Palette::AtomPropertyNeutronsHighlighted;
+        propertyColorMax = Palette::AtomPropertyNeutrons;
+        propertyColorMaxHighlighted = Palette::AtomPropertyNeutronsHighlighted;
+        propertyColorMin = Palette::AtomPropertyNeutronsMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyNeutronsMinHighlighted;
         break;
       case ColorByMass:
-        propertyColor = Palette::AtomPropertyMass;
-        propertyColorHighlighted = Palette::AtomPropertyMassHighlighted;
+        propertyColorMax = Palette::AtomPropertyMass;
+        propertyColorMaxHighlighted = Palette::AtomPropertyMassHighlighted;
+        propertyColorMin = Palette::AtomPropertyMassMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyMassMinHighlighted;
         break;
       case ColorByElectronegativity:
-        propertyColor = Palette::AtomPropertyElectroneg;
-        propertyColorHighlighted = Palette::AtomPropertyElectronegHighlighted;
+        propertyColorMax = Palette::AtomPropertyElectroneg;
+        propertyColorMaxHighlighted = Palette::AtomPropertyElectronegHighlighted;
+        propertyColorMin = Palette::AtomPropertyElectronegMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyElectronegMinHighlighted;
         break;
       case ColorByAtomicRadius:
-        propertyColor = Palette::AtomPropertyAtomicRadius;
-        propertyColorHighlighted = Palette::AtomPropertyAtomicRadiusHighlighted;
+        propertyColorMax = Palette::AtomPropertyAtomicRadius;
+        propertyColorMaxHighlighted = Palette::AtomPropertyAtomicRadiusHighlighted;
+        propertyColorMin = Palette::AtomPropertyAtomicRadiusMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyAtomicRadiusMinHighlighted;
         break;
       case ColorByElectronAffinity:
-        propertyColor = Palette::AtomPropertyElectronAffinity;
-        propertyColorHighlighted = Palette::AtomPropertyElectronAffinityHighlighted;
+        propertyColorMax = Palette::AtomPropertyElectronAffinity;
+        propertyColorMaxHighlighted = Palette::AtomPropertyElectronAffinityHighlighted;
+        propertyColorMin = Palette::AtomPropertyElectronAffinityMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyElectronAffinityMinHighlighted;
+        break;
+      case ColorByIonisation:
+        propertyColorMax = Palette::AtomPropertyIonisation;
+        propertyColorMaxHighlighted = Palette::AtomPropertyIonisationHighlighted;
+        propertyColorMin = Palette::AtomPropertyIonisationMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyIonisationMinHighlighted;
         break;
       case ColorByMeltingPoint:
-        propertyColor = Palette::AtomPropertyMeltingPoint;
-        propertyColorHighlighted = Palette::AtomPropertyMeltingPointHighlighted;
+        propertyColorMax = Palette::AtomPropertyMeltingPoint;
+        propertyColorMaxHighlighted = Palette::AtomPropertyMeltingPointHighlighted;
+        propertyColorMin = Palette::AtomPropertyMeltingPointMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyMeltingPointMinHighlighted;
         break;
       case ColorByBoilingPoint:
-        propertyColor = Palette::AtomPropertyBoilingPoint;
-        propertyColorHighlighted = Palette::AtomPropertyBoilingPointHighlighted;
+        propertyColorMax = Palette::AtomPropertyBoilingPoint;
+        propertyColorMaxHighlighted = Palette::AtomPropertyBoilingPointHighlighted;
+        propertyColorMin = Palette::AtomPropertyBoilingPointMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyBoilingPointMinHighlighted;
         break;
       case ColorByDensity:
-        propertyColor = Palette::AtomPropertyDensity;
-        propertyColorHighlighted = Palette::AtomPropertyDensityHighlighted;
+        propertyColorMax = Palette::AtomPropertyDensity;
+        propertyColorMaxHighlighted = Palette::AtomPropertyDensityHighlighted;
+        propertyColorMin = Palette::AtomPropertyDensityMin;
+        propertyColorMinHighlighted = Palette::AtomPropertyDensityMinHighlighted;
         break;
       default:
         break;
     }
+    // `propertyColorMin` / `propertyColorMinHighlighted` are read from the theme
+
     int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
     for (int i = 0; i < count; i++) {
       const AtomDef & a = atomsdefs[i];
@@ -634,21 +743,29 @@ void TableController::setColorProperty(ColorProperty p) {
         case ColorByElectronegativity: v = a.electroneg; break;
         case ColorByAtomicRadius: v = a.atomicRadius; break;
         case ColorByElectronAffinity: v = a.electronAffinity; break;
+        case ColorByIonisation: v = a.ionisation; break;
         case ColorByMeltingPoint: v = a.meltingPoint; break;
         case ColorByBoilingPoint: v = a.boilingPoint; break;
         case ColorByDensity: v = a.density; break;
         default: v = -1; break;
       }
       if (v < 0) {
+        // N/A -> keep theme secondary background / secondary text
         m_precomputedBg[i] = Palette::BackgroundAppsSecondary;
         m_precomputedText[i] = Palette::SecondaryText;
       } else {
+        // Map value to [0,1] range and blend between min and max colors
         double ratio = (v - m_propertyMin) / (m_propertyMax - m_propertyMin);
-        if (ratio < 0.0) { ratio = 0.0; }
-        if (ratio > 1.0) { ratio = 1.0; }
-        uint8_t alpha = static_cast<uint8_t>(ratio * 255);
-        m_precomputedBg[i] = KDColor::blend(propertyColor, Palette::BackgroundAppsSecondary, alpha);
-        m_precomputedText[i] = KDColor::blend(propertyColorHighlighted, Palette::SecondaryText, alpha);
+        if (ratio >= 1.0) {
+          m_precomputedBg[i] = propertyColorMax;
+          m_precomputedText[i] = propertyColorMaxHighlighted;
+        } else {
+          int alpha = static_cast<int>(ratio * 255.0 + 0.5);
+          if (alpha < 0) { alpha = 0; }
+          if (alpha > 255) { alpha = 255; }
+          m_precomputedBg[i] = KDColor::blend(propertyColorMax, propertyColorMin, static_cast<uint8_t>(alpha));
+          m_precomputedText[i] = KDColor::blend(propertyColorMaxHighlighted, propertyColorMinHighlighted, static_cast<uint8_t>(alpha));
+        }
       }
     }
     m_precomputedColorsValid = true;
@@ -668,6 +785,16 @@ void TableController::clearColorProperty() {
 
 void TableController::reloadTableData() {
   m_view.selectableTableView()->reloadData(false);
+  // Refresh cursor color after cell colors may have changed
+  if (m_cursor >= 0) {
+    const AtomDef & a = atomsdefs[m_cursor];
+    KDColor cursorColor = Palette::AtomColorHighlighted[a.type];
+    if (m_coloringActive) {
+      cursorColor = m_precomputedColorsValid ? m_precomputedText[m_cursor]
+                                             : Palette::AtomColorHighlighted[a.type];
+    }
+    m_view.updateCursorFrame(a.x, a.y, cursorColor);
+  }
 }
 
 SelectableTableViewDataSource * TableController::selectionDataSource() const {
@@ -686,7 +813,14 @@ void TableController::setSelection(AtomDef atom) {
   }
 
   m_view.setAtom(atom);
-  m_list.setAtom(atomsdefs[m_cursor]);
+  // Compute cursor color matching willDisplayCellAtLocation logic
+  KDColor cursorColor = Palette::AtomColorHighlighted[atom.type];
+  if (m_coloringActive && atomIndex >= 0) {
+    cursorColor = m_precomputedColorsValid ? m_precomputedText[atomIndex]
+                                           : Palette::AtomColorHighlighted[atomsdefs[atomIndex].type];
+  }
+  m_view.updateCursorFrame(atom.x, atom.y, cursorColor);
+  // m_list is updated lazily in handleEvent (OK) and moveCursorInMenu
   updateFooterPropertyDisplay(m_cursor);
 }
 
@@ -707,15 +841,21 @@ void TableController::updateFooterPropertyDisplay(int atomIndex, bool force) {
   KDColor bg = Palette::BackgroundApps;
   KDColor fg = Palette::PrimaryText;
   if (data.valueForColor < 0) {
+    // N/A -> keep theme secondary background / secondary text
     bg = Palette::BackgroundAppsSecondary;
     fg = Palette::SecondaryText;
   } else if (m_propertyMax > m_propertyMin) {
     double ratio = (data.valueForColor - m_propertyMin) / (m_propertyMax - m_propertyMin);
-    if (ratio < 0.0) { ratio = 0.0; }
-    if (ratio > 1.0) { ratio = 1.0; }
-    uint8_t alpha = static_cast<uint8_t>(ratio * 255);
-    bg = KDColor::blend(data.propertyColor, Palette::BackgroundAppsSecondary, alpha);
-    fg = KDColor::blend(data.propertyColorHighlighted, Palette::SecondaryText, alpha);
+    if (ratio >= 1.0) {
+      bg = data.propertyColorMax;
+      fg = data.propertyColorMaxHighlighted;
+    } else {
+      int alpha = static_cast<int>(ratio * 255.0 + 0.5);
+      if (alpha < 0) { alpha = 0; }
+      if (alpha > 255) { alpha = 255; }
+      bg = KDColor::blend(data.propertyColorMax, data.propertyColorMin, static_cast<uint8_t>(alpha));
+      fg = KDColor::blend(data.propertyColorMaxHighlighted, data.propertyColorMinHighlighted, static_cast<uint8_t>(alpha));
+    }
   }
 
   if (!force
@@ -735,51 +875,25 @@ void TableController::updateFooterPropertyDisplay(int atomIndex, bool force) {
   m_lastFooterFg = fg;
 }
 
-void TableController::appendCharacterToSearch(char c) {
-  if (m_searchLength == 0) {
-    m_searchStartCursor = m_cursor;
-  }
-  if (m_searchLength >= static_cast<int>(sizeof(m_searchBuffer) - 1)) {
-    return;
-  }
-  for (int i = m_searchLength; i > m_searchCursor; i--) {
-    m_searchBuffer[i] = m_searchBuffer[i - 1];
-  }
-  m_searchBuffer[m_searchCursor] = c;
-  m_searchLength++;
-  m_searchCursor++;
-  m_searchBuffer[m_searchLength] = '\0';
-  refreshSearchResults();
-}
-
-void TableController::removeCharacterFromSearch() {
-  if (m_searchLength <= 0 || m_searchCursor <= 0) {
-    return;
-  }
-  for (int i = m_searchCursor - 1; i < m_searchLength - 1; i++) {
-    m_searchBuffer[i] = m_searchBuffer[i + 1];
-  }
-  m_searchCursor--;
-  m_searchLength--;
-  m_searchBuffer[m_searchLength] = '\0';
-  refreshSearchResults();
-}
-
 void TableController::clearSearch() {
-  bool hadSearch = m_searchActive || m_searchLength > 0;
-  m_searchLength = 0;
-  m_searchCursor = 0;
+  bool hadSearch = m_searchActive || strlen(m_searchBuffer) > 0;
   m_searchBuffer[0] = '\0';
   m_searchStartCursor = -1;
   m_searchActive = false;
   m_bestSearchResult = -1;
+  if (m_searchField.isEditing()) {
+    m_searchField.setEditing(false);
+  }
   int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
   for (int i = 0; i < count; i++) {
     m_searchMatches[i] = true;
   }
   m_view.setInfoVisible(true);
-  m_view.setSearchInput(false, nullptr, 0);
+  m_view.setSearchVisible(false);
   m_view.selectableTableView()->reloadData(false);
+  if (Container::activeApp()->firstResponder() != this) {
+    Container::activeApp()->setFirstResponder(this);
+  }
   if (hadSearch) {
     setSelection(atomsdefs[m_cursor]);
   }
@@ -787,7 +901,9 @@ void TableController::clearSearch() {
 
 void TableController::refreshSearchResults() {
   int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
-  if (m_searchLength <= 0) {
+  int searchLen = static_cast<int>(strlen(m_searchBuffer));
+
+  if (searchLen == 0) {
     clearSearch();
     return;
   }
@@ -798,7 +914,7 @@ void TableController::refreshSearchResults() {
   m_bestSearchResult = -1;
   int bestScore = -1;
   for (int i = 0; i < count; i++) {
-    int score = scoreForSearch(atomsdefs[i], m_searchBuffer, m_searchLength, numericSearch);
+    int score = scoreForSearch(atomsdefs[i], m_searchBuffer, searchLen, numericSearch);
     bool isMatch = score >= 0;
     bool wasMatch = m_searchMatches[i];
     m_searchMatches[i] = isMatch;
@@ -817,11 +933,64 @@ void TableController::refreshSearchResults() {
   } else {
     m_view.setInfoVisible(false);
     m_view.selectableTableView()->deselectTable();
+    // No matches -> hide the cursor overlay
+    m_view.hideCursor();
   }
-  m_view.setSearchInput(true, m_searchBuffer, m_searchCursor);
   if (!wasSearchActive) {
     m_view.selectableTableView()->reloadData(false);
   }
+}
+
+bool TableController::textFieldShouldFinishEditing(TextField * textField, Ion::Events::Event event) {
+  return event == Ion::Events::OK || event == Ion::Events::EXE;
+}
+
+bool TableController::textFieldDidReceiveEvent(TextField * textField, Ion::Events::Event event) {
+  if (event == Ion::Events::Up) {
+    int nextIndex = nextSearchResultIndex(-1);
+    if (nextIndex >= 0) {
+      m_cursor = nextIndex;
+      setSelection(atomsdefs[m_cursor]);
+    }
+    return true;
+  }
+  if (event == Ion::Events::Down) {
+    int nextIndex = nextSearchResultIndex(1);
+    if (nextIndex >= 0) {
+      m_cursor = nextIndex;
+      setSelection(atomsdefs[m_cursor]);
+    }
+    return true;
+  }
+  return false;
+}
+
+bool TableController::textFieldDidFinishEditing(TextField * textField, const char * text, Ion::Events::Event event) {
+  int count = static_cast<int>(sizeof(atomsdefs) / sizeof(AtomDef));
+  if (m_cursor >= 0 && m_cursor < count && m_searchMatches[m_cursor]) {
+    // Keep current selection chosen with Up/Down
+  } else if (m_bestSearchResult >= 0) {
+    m_cursor = m_bestSearchResult;
+  } else if (m_searchStartCursor >= 0) {
+    m_cursor = m_searchStartCursor;
+  }
+  setSelection(atomsdefs[m_cursor]);
+  clearSearch();
+  return true;
+}
+
+bool TableController::textFieldDidAbortEditing(TextField * textField) {
+  clearSearch();
+  return true;
+}
+
+bool TableController::textFieldDidHandleEvent(TextField * textField, bool returnValue, bool textSizeDidChange) {
+  if (textSizeDidChange) {
+    const char * draft = textField->draftTextBuffer();
+    strlcpy(m_searchBuffer, draft, sizeof(m_searchBuffer));
+    refreshSearchResults();
+  }
+  return returnValue;
 }
 
 int TableController::nextSearchResultIndex(int direction) const {

@@ -2,7 +2,6 @@
 #include "kandinsky/color.h"
 #include "kandinsky/rect.h"
 #include <poincare/integer.h>
-#include <poincare/number.h>
 #include <escher/palette.h>
 #include <algorithm>
 
@@ -94,6 +93,7 @@ void atomInfo::layoutSubviews(bool force) {
 }
 
 void atomInfo::setAtom(AtomDef atom) {
+  if (m_atom.num == atom.num) { return; }
   m_atom = atom;
   m_atomName.setMessage(atom.name);
   // Precompute serialized nucleons/protons and sizes to avoid work in drawRect

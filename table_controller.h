@@ -2,6 +2,7 @@
 #define ATOMIC_TABLE_CONTROLLER_H
 
 #include <escher.h>
+#include <escher/input_event_handler_delegate.h>
 #include "atomic_cell.h"
 #include "atom_info.h"
 #include "table_lines_view.h"
@@ -11,7 +12,7 @@
 
 namespace Atomic {
 
-class TableController : public ViewController, public SimpleTableViewDataSource, public SelectableTableViewDelegate {
+class TableController : public ViewController, public SimpleTableViewDataSource, public SelectableTableViewDelegate, public TextFieldDelegate, public InputEventHandlerDelegate {
 public:
   TableController(Responder * parentResponder, SelectableTableViewDataSource * selectionDataSource);
 
@@ -29,6 +30,7 @@ public:
     ColorByElectronegativity,
     ColorByAtomicRadius,
     ColorByElectronAffinity,
+    ColorByIonisation,
     ColorByMeltingPoint,
     ColorByBoilingPoint,
     ColorByDensity
@@ -38,6 +40,17 @@ public:
   void clearColorProperty();
   void reloadTableData();
   bool moveCursorInMenu(int direction);
+
+  // TextFieldDelegate
+  bool textFieldShouldFinishEditing(TextField * textField, Ion::Events::Event event) override;
+  bool textFieldDidReceiveEvent(TextField * textField, Ion::Events::Event event) override;
+  bool textFieldDidFinishEditing(TextField * textField, const char * text, Ion::Events::Event event) override;
+  bool textFieldDidAbortEditing(TextField * textField) override;
+  bool textFieldDidHandleEvent(TextField * textField, bool returnValue, bool textSizeDidChange) override;
+
+  // InputEventHandlerDelegate
+  Toolbox * toolboxForInputEventHandler(InputEventHandler * handler) override { return nullptr; }
+  NestedMenuController * variableBoxForInputEventHandler(InputEventHandler * handler) override { return nullptr; }
 
   int numberOfRows() const override;
   int numberOfColumns() const override;
@@ -49,8 +62,6 @@ public:
 private:
   SelectableTableViewDataSource * selectionDataSource() const;
   void setSelection(AtomDef atom);
-  void appendCharacterToSearch(char c);
-  void removeCharacterFromSearch();
   void clearSearch();
   void refreshSearchResults();
   int nextSearchResultIndex(int direction) const;
@@ -61,22 +72,37 @@ private:
   StackViewController * stackController() const;
   class ContentView : public View {
   public:
-    ContentView(TableController * controller, SelectableTableViewDataSource * selectionDataSource);
+    ContentView(TableController * controller, SelectableTableViewDataSource * selectionDataSource, TextField * searchField);
     SelectableTableView * selectableTableView();
     void drawRect(KDContext * ctx, KDRect rect) const override;
     void setAtom(AtomDef atom);
-    void setSearchInput(bool active, const char * text, int cursor);
+    void setSearchVisible(bool active);
     void setInfoVisible(bool visible);
     void setPropertyDisplay(const char * label, const char * value, KDColor bgColor, KDColor textColor);
     void clearPropertyDisplay();
+    void updateCursorFrame(int col, int row, KDColor color);
+    void hideCursor();
   private:
     int numberOfSubviews() const override;
     View * subviewAtIndex(int index) override;
     void layoutSubviews(bool force = false) override;
+    class CursorView : public View {
+    public:
+      CursorView() : m_color(KDColorWhite) {}
+      void setColor(KDColor c) { m_color = c; }
+      void drawRect(KDContext * ctx, KDRect rect) const override {
+        ctx->strokeRect(bounds(), m_color);
+      }
+    private:
+      KDColor m_color;
+    };
     SelectableTableView m_selectableTableView;
     atomInfo m_info;
     tableLinesView m_lines;
     TypeFooterView m_typeFooter;
+    CursorView m_cursor;
+    TextField * m_searchFieldPtr;
+    bool m_searchVisible = false;
   };
   static constexpr KDCoordinate k_sideMargin = 6;
   static constexpr KDCoordinate k_indicatorMargin = 61;
@@ -86,12 +112,11 @@ private:
   static constexpr int k_cellHeight = 17;
   static constexpr int k_cellWidth = 17;
   int m_position;
+  char m_searchBuffer[20];
+  TextField m_searchField;
   ContentView m_view;
   AtomicCell m_cells[k_maxNumberOfCells];
   bool m_searchMatches[k_maxNumberOfCells];
-  char m_searchBuffer[20];
-  int m_searchLength;
-  int m_searchCursor;
   int m_searchStartCursor;
   int m_bestSearchResult;
   bool m_searchActive;

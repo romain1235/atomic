@@ -7,39 +7,23 @@
 
 namespace Atomic {
 
-ListController::InnerView::InnerView(ListController * dataSource) :
-  ViewController(dataSource),
-  m_selectableTableView(this, dataSource, dataSource, dataSource)
+ListController::ListController(Responder * parentResponder) :
+  ViewController(parentResponder),
+  m_selectableTableView(this, this, this, this),
+  m_parent(parentResponder)
 {
   m_selectableTableView.setDecoratorType(ScrollView::Decorator::Type::Bars);
   m_selectableTableView.setMargins(0, 13, 0, 0);
-}
-
-void ListController::InnerView::setAtom(AtomDef atom) {
-  if (m_hasAtom && m_atom.num == atom.num) {
-    return;
-  }
-  m_atom = atom;
-  // Reload the selectable view to reflect the new atom
-  m_selectableTableView.reloadData(false);
-}
-
-void ListController::InnerView::didBecomeFirstResponder() {
-  m_selectableTableView.reloadData();
-  m_selectableTableView.selectCellAtLocation(0,1);
-}
-
-ListController::ListController(Responder * parentResponder) :
-  StackViewController(parentResponder, &m_innerView, Palette::PurpleBright, Palette::PurpleDark),
-  m_innerView(this),
-  m_parent(parentResponder)
-{
   for (int i = 0; i < k_numberOfCellsWithBuffer; i++) {
     m_cellsWithBuffer[i].setMessageFont(KDFont::LargeFont);
   }
   for (int i = 0; i < k_numberOfCellsWithExpression; i++) {
     m_cellsWithExpression[i].setMessageFont(KDFont::LargeFont);
   }
+}
+
+const char * ListController::title() {
+  return I18n::translate(m_atom.name);
 }
 
 bool ListController::handleEvent(Ion::Events::Event event) {
@@ -53,7 +37,7 @@ bool ListController::handleEvent(Ion::Events::Event event) {
     TableController * parentTC = reinterpret_cast<TableController *>(m_parent);
     // Map rows to properties: 2=num, 3=neutrons, 4=types, 5=mass, 6=electroneg
     if (focusRow >= 2 && focusRow <= 6) {
-      Container::activeApp()->dismissModalViewController();
+      static_cast<StackViewController *>(parentResponder())->pop();
       switch (focusRow) {
         case 2:
           parentTC->setColorProperty(TableController::ColorByAtomicNumber);
@@ -74,9 +58,9 @@ bool ListController::handleEvent(Ion::Events::Event event) {
       parentTC->reloadTableData();
       return true;
     }
-    // New property rows (after Electronical row) -> 8..12
-    if (focusRow >= 8 && focusRow <= 12) {
-      Container::activeApp()->dismissModalViewController();
+    // New property rows (after Electronical row) -> 8..13
+    if (focusRow >= 8 && focusRow <= 13) {
+      static_cast<StackViewController *>(parentResponder())->pop();
       switch (focusRow) {
         case 8:
           parentTC->setColorProperty(TableController::ColorByAtomicRadius);
@@ -85,12 +69,15 @@ bool ListController::handleEvent(Ion::Events::Event event) {
           parentTC->setColorProperty(TableController::ColorByElectronAffinity);
           break;
         case 10:
-          parentTC->setColorProperty(TableController::ColorByMeltingPoint);
+          parentTC->setColorProperty(TableController::ColorByIonisation);
           break;
         case 11:
-          parentTC->setColorProperty(TableController::ColorByBoilingPoint);
+          parentTC->setColorProperty(TableController::ColorByMeltingPoint);
           break;
         case 12:
+          parentTC->setColorProperty(TableController::ColorByBoilingPoint);
+          break;
+        case 13:
           parentTC->setColorProperty(TableController::ColorByDensity);
           break;
       }
@@ -103,22 +90,36 @@ bool ListController::handleEvent(Ion::Events::Event event) {
 }
 
 void ListController::didBecomeFirstResponder() {
-  selectCellAtLocation(0, 0);
-  Container::activeApp()->setFirstResponder(&m_innerView);
+  m_selectableTableView.reloadData(false);
+  m_selectableTableView.selectCellAtLocation(0, 1);
+  // Ensure the selectable table view receives input events
+  Container::activeApp()->setFirstResponder(&m_selectableTableView);
 }
 
 void ListController::setPropertyColors(KDColor bg, KDColor text) {
   m_propertyBg = bg;
   m_propertyText = text;
   m_hasPropertyColors = true;
-  m_innerView.selectableTableView()->reloadData(false);
+  m_selectableTableView.reloadData(false);
+  m_selectableTableView.forceRedraw();
 }
 
 void ListController::clearPropertyColors() {
   if (m_hasPropertyColors) {
     m_hasPropertyColors = false;
-    m_innerView.selectableTableView()->reloadData(false);
+    m_selectableTableView.reloadData(false);
+    m_selectableTableView.forceRedraw();
   }
+}
+
+void ListController::refreshNavigation() {
+  // Re-announce the current selection to the delegate (withinTemporarySelection=false)
+  // so that scroll-to-row-0 fires for row 1, and the first responder is properly set.
+  int row = m_selectableTableView.selectedRow();
+  if (row <= 0) row = 1;
+  m_selectableTableView.selectCellAtLocation(0, row);
+  // Ensure first responder stays on the selectable table after programmatic selection
+  Container::activeApp()->setFirstResponder(&m_selectableTableView);
 }
 
 int ListController::numberOfRows() const {
@@ -137,7 +138,6 @@ KDCoordinate ListController::rowHeight(int j) {
 
 
 HighlightCell * ListController::reusableCell(int index, int type) {
-  assert(index < k_numberOfRow);
   switch (type) {
     case 0:
       {
@@ -146,10 +146,12 @@ HighlightCell * ListController::reusableCell(int index, int type) {
       }
     case 1:
       {
+        assert(index < k_numberOfCellsWithBuffer);
         return &m_cellsWithBuffer[index];
       }
     case 2:
       {
+        assert(index < k_numberOfCellsWithExpression);
         return &m_cellsWithExpression[index];
       }
     default:
@@ -185,6 +187,7 @@ int ListController::reusableCellCount(int type) {
       return k_numberOfCellsWithExpression;
     default:
       assert(false);
+      return 0;
   }
 }
 
@@ -199,8 +202,15 @@ int ListController::typeAtLocation(int i, int j) {
 }
 
 void ListController::setAtom(AtomDef atom) {
-  m_atom = atom; 
-  m_innerView.setAtom(atom); 
+  // Guard: skip recomputation if this atom is already loaded
+  if (m_cachedElectronicalAtomNum == atom.num) {
+    return;
+  }
+  m_atom = atom;
+  m_cachedElectronicalAtomNum = atom.num;
+  m_cachedElectronicalLayout = Electronical::createElectronical(atom);
+  m_selectableTableView.reloadData(false);
+  m_selectableTableView.forceRedraw();
 }
 
 void ListController::unhighlightTopCells() {
@@ -208,7 +218,7 @@ void ListController::unhighlightTopCells() {
   m_cellsWithExpression[1].setHighlighted(false);
   // FIXME This fix is ugly (just supposing that there's the 2 first cellsWithExpression that can be seen when scrolling on 1st cell)
   // This assert is supposed to be triggered if the view is modified and this fix is not working anymore...
-  assert(rowHeight(0) + rowHeight(1) + rowHeight(2) + rowHeight(3) >= m_innerView.view()->bounds().height());
+  assert(rowHeight(0) + rowHeight(1) + rowHeight(2) + rowHeight(3) >= m_selectableTableView.bounds().height());
 }
 
 void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
@@ -279,7 +289,7 @@ void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
     case 7: {
       MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
       myCell->setMessage(I18n::Message::AtomEC);
-      myCell->setLayoutWithCopy(Electronical::createElectronical(m_atom));
+      myCell->setLayoutWithCopy(m_cachedElectronicalLayout);
       return;
     }
     case 8: {
@@ -308,6 +318,18 @@ void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
     }
     case 10: {
       MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
+      myCell->setMessage(I18n::Message::AtomIonisation);
+      if (m_atom.ionisation < 0) {
+        myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
+        return;
+      }
+      Poincare::Layout numLayoutI = Poincare::FloatNode<double>(m_atom.ionisation).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 5);
+      Poincare::HorizontalLayout fullLayoutI = Poincare::HorizontalLayout::Builder(numLayoutI, Poincare::LayoutHelper::String(" eV", strlen(" eV"), KDFont::SmallFont));
+      myCell->setLayoutWithCopy(fullLayoutI);
+      return;
+    }
+    case 11: {
+      MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
       myCell->setMessage(I18n::Message::AtomMeltingPoint);
       if (m_atom.meltingPoint < 0) {
         myCell->setLayoutWithCopy(Poincare::LayoutHelper::String("N/A", strlen("N/A")));
@@ -318,7 +340,7 @@ void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
       myCell->setLayoutWithCopy(fullLayoutM);
       return;
     }
-    case 11: {
+    case 12: {
       MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
       myCell->setMessage(I18n::Message::AtomBoilingPoint);
       if (m_atom.boilingPoint < 0) {
@@ -330,7 +352,7 @@ void ListController::willDisplayCellForIndex(HighlightCell * cell, int index) {
       myCell->setLayoutWithCopy(fullLayoutB);
       return;
     }
-    case 12: {
+    case 13: {
       MessageTableCellWithExpressionWithCopy * myCell = (MessageTableCellWithExpressionWithCopy *)cell;
       myCell->setMessage(I18n::Message::AtomDensity);
       if (m_atom.density < 0) {

@@ -32,9 +32,6 @@ void AtomicCell::drawRect(KDContext * ctx, KDRect rect) const {
     ctx->fillRect(rect, color);
 
     if (m_searchActive && !m_searchMatch) {
-      if (isHighlighted()) {
-        ctx->strokeRect(rect, textColor);
-      }
       return;
     }
 
@@ -44,10 +41,6 @@ void AtomicCell::drawRect(KDContext * ctx, KDRect rect) const {
     // Center text in cell
     KDPoint textPosition(bounds().topLeft().x() + (bounds().width() - textSize.width()) / 2, bounds().topLeft().y() + (bounds().height() - textSize.height()) / 2);
     ctx->drawString(m_atom.symbol, textPosition, KDFont::SmallFont, textColor, color);
-    if (isHighlighted()) {
-      ctx->strokeRect(rect, textColor);
-
-    }
   } else {
     ctx->fillRect(rect, Palette::BackgroundApps);
   }
