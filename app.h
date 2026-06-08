@@ -2,6 +2,7 @@
 #define ATOMIC_APP_H
 
 #include "../shared/shared_app.h"
+#include "../shared/poincare_local_pool.h"
 #include "table_controller.h"
 #include <escher.h>
 
@@ -31,6 +32,7 @@ private:
   App(Snapshot * snapshot);
   TableController m_controller;
   StackViewController m_stackViewController;
+  Shared::PoincareLocalPool m_poincarePool;
 };
 
 }
